@@ -169,6 +169,8 @@ export default function AddAccountDialog(props: AddAccountDialogProps) {
             ipcRenderer.once('validateImapReply', (eve:any, res:any) => {
                 console.log(res);
                 if (res === true) {
+                    
+
                     ipcRenderer.send("addAccount", {
                         description: description,
                         host: host,

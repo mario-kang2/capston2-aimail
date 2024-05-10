@@ -2,6 +2,8 @@ const {app, BrowserWindow, ipcMain} = require('electron');
 const path = require('path');
 const url = require('url');
 const sqlite3 = require('sqlite3');
+const crypto = require('crypto');
+const { escape } = require('querystring');
 
 const db = new sqlite3.Database("./mail.db");
 
@@ -56,9 +58,6 @@ ipcMain.on('lookupAccountDatabase', (eve) => {
 
 // IMAP 유효성 검사
 ipcMain.on('validateImap', (eve, args) => {
-    const log = require('electron-log');
-    log.info(args);
-
     const Imap = require('node-imap');
     const imap = new Imap({
         user: args.user,
@@ -84,14 +83,86 @@ ipcMain.on('validateImap', (eve, args) => {
 
 // SMTP 유효성 검사
 
-// 계정 정보 추가
+// 계정 정보 추가 
 ipcMain.on('addAccount', (eve, args) => {
     db.run('INSERT INTO mail_account (description, mailHost, mailPort, mailSecurity, mailUsername, mailEmail, mailPassword) VALUES (?, ?, ?, ?, ?, ?, ?)', [args.description, args.host, args.port, args.security, args.username, args.emailAddress, args.password], err => {
         eve.sender.send('addAccountReply', err);
     });
 });
 
-// 계정 정보 조회
+// 메일 목록 조회 (IMAP)
+ipcMain.on('getMailList', (eve, args) => {
+    const log = require('electron-log');
+
+    const Imap = require('node-imap');
+    const inspect = require('util').inspect;
+    const imap = new Imap({
+        user: args.mailEmail,
+        password: args.mailPassword,
+        host: args.mailHost,
+        port: args.mailPort,
+        tls: args.mailSecurity === 'ssl' || args.mailSecurity === 'starttls'
+    });
+
+    function openInbox(cb) {
+        imap.openBox('INBOX', true, cb);
+    }
+
+    // BASE64 to UTF-8 String
+    function base64ToBytes(base64str) {
+        return decodeURIComponent(atob(base64str).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+    }
+
+    var mailBox = [];
+
+    imap.once('ready', function() { 
+        openInbox(function(err, box) {
+            if (err) throw err;
+            var f = imap.seq.fetch('1:*', {
+                bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE BODY)', 'TEXT'],
+                struct: true
+            });
+            f.on('message', function(msg, seqno) {
+                var mails = {};
+                msg.on('body', function(stream, info) {
+                    var buffer = '';
+                    stream.on('data', function(chunk) {
+                        buffer += chunk.toString('utf8');
+                    });
+                    stream.once('end', function() {
+                        if (info.which !== 'TEXT')
+                            mails['header'] = inspect(Imap.parseHeader(buffer));
+                        else {
+                            var buff = buffer;
+                            let regex1 = /\r\n/gi;
+                            let regex2 = /\n/gi;
+                            buff = buff.replace(regex1, '').replace(regex2, '');
+                            //const stringDecoded = base64ToBytes(buff);
+                            mails['text'] = buff;
+                        }
+                           
+                    });
+                });
+                msg.once('attributes', function(attrs) {
+                    mails['attributes'] = inspect(attrs, false, 8);
+                });
+                msg.once('end', function() {
+                    mailBox.push(mails);
+                });
+            });
+            f.once('error', function(err) {});
+            f.once('end', function() {
+                imap.end();
+            });
+        });
+    });
+    imap.once('end', function() {
+        eve.sender.send('getMailListReply', mailBox);
+    })
+    imap.connect();
+});
 
 // 계정 정보 삭제
 
