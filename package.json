@@ -17,6 +17,7 @@
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
     "electron-log": "^5.1.2",
     "node-imap": "^0.9.6",
     "react": "^18.3.1",
@@ -32,10 +33,10 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "react-start": "BROWSER=none yarn start",
+    "react-start": "cross-env BROWSER=none npm run start",
     "electron-start": "ELECTRON_START_URL=http://localhost:3000 electron .",
-    "electron-pack": "yarn build && electron-builder build -c.extraMetadata.main=build/main.js",
-    "dev": "concurrently \"yarn react-start\" \"wait-on http://localhost:3000 && yarn electron-start\""
+    "electron-pack": "npm run build && electron-builder build -c.extraMetadata.main=build/main.js",
+    "dev": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && npm run electron-start\""
   },
   "eslintConfig": {
     "extends": [
