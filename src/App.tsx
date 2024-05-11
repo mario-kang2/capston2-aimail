@@ -29,11 +29,13 @@ function App() {
       setAccountData(res);
       ipcRenderer.send("getMailList", res[0]);
       ipcRenderer.once('getMailListReply', (eve:any, res:any) => {
+        console.log("show start");
         var a: any = []
         console.log(res);
         res.forEach((element: any) => {
-          console.log(element.header);
-          let headerJson = eval("("+element.header+")");
+          console.log(element);
+          let headerJson = element;
+          console.log(headerJson);
           a.push(headerJson);
         });
         setMailHeaderList(a);

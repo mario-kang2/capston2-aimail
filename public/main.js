@@ -4,6 +4,7 @@ const url = require('url');
 const sqlite3 = require('sqlite3');
 const crypto = require('crypto');
 const { escape } = require('querystring');
+const management = require("./emailmanagement");
 
 const db = new sqlite3.Database("./mail.db");
 
@@ -25,6 +26,7 @@ function createWindow() {
 
     win.loadURL(startUrl);
     win.webContents.openDevTools();
+    management.setupDatabase();
 }
 
 
@@ -104,64 +106,7 @@ ipcMain.on('getMailList', (eve, args) => {
         tls: args.mailSecurity === 'ssl' || args.mailSecurity === 'starttls'
     });
 
-    function openInbox(cb) {
-        imap.openBox('INBOX', true, cb);
-    }
-
-    // BASE64 to UTF-8 String
-    function base64ToBytes(base64str) {
-        return decodeURIComponent(atob(base64str).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-    }
-
-    var mailBox = [];
-
-    imap.once('ready', function() { 
-        openInbox(function(err, box) {
-            if (err) throw err;
-            var f = imap.seq.fetch('1:*', {
-                bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE BODY)', 'TEXT'],
-                struct: true
-            });
-            f.on('message', function(msg, seqno) {
-                var mails = {};
-                msg.on('body', function(stream, info) {
-                    var buffer = '';
-                    stream.on('data', function(chunk) {
-                        buffer += chunk.toString('utf8');
-                    });
-                    stream.once('end', function() {
-                        if (info.which !== 'TEXT')
-                            mails['header'] = inspect(Imap.parseHeader(buffer));
-                        else {
-                            var buff = buffer;
-                            let regex1 = /\r\n/gi;
-                            let regex2 = /\n/gi;
-                            buff = buff.replace(regex1, '').replace(regex2, '');
-                            //const stringDecoded = base64ToBytes(buff);
-                            mails['text'] = buff;
-                        }
-                           
-                    });
-                });
-                msg.once('attributes', function(attrs) {
-                    mails['attributes'] = inspect(attrs, false, 8);
-                });
-                msg.once('end', function() {
-                    mailBox.push(mails);
-                });
-            });
-            f.once('error', function(err) {});
-            f.once('end', function() {
-                imap.end();
-            });
-        });
-    });
-    imap.once('end', function() {
-        eve.sender.send('getMailListReply', mailBox);
-    })
-    imap.connect();
+    management.fetchNewEmails(imap,eve);
 });
 
 // 계정 정보 삭제
