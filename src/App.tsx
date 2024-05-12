@@ -3,6 +3,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import React, { useEffect } from 'react';
 import AddAccountDialog from './AddAccountDialog'
 import { Add } from '@mui/icons-material';
+import { createRoot } from 'react-dom/client';
 
 const drawerWidth = 240;
 
@@ -14,6 +15,7 @@ function App() {
   const [accountData, setAccountData] = React.useState([]);
 
   const [mailHeaderList, setMailHeaderList] = React.useState([]);
+  const [mailBody, SetMailBody] = React.useState("");
   // 메일 계정 데이터 확인 후 없으면 계정 등록 Dialog 호출
   // 메일 계정 데이터가 있으면 각 계정당 메일 목록 가져오기
   useEffect(() => {
@@ -38,6 +40,7 @@ function App() {
           console.log(headerJson);
           a.push(headerJson);
         });
+        a.reverse();
         setMailHeaderList(a);
         ipcRenderer.removeAllListeners('getMailListReply');
       })
@@ -63,14 +66,25 @@ function App() {
     }
   }
 
-  // 메일 목록 Drawer
+  const handleMailBody = (index: number) => {
+    const bodyElement = document.getElementById('mailBody');
+    if (bodyElement) {
+      let bodyDOM = createRoot(bodyElement);
+      
+      let body = <div dangerouslySetInnerHTML={{__html: mailHeaderList[index]["body"]}}></div>;
+      bodyDOM.render(body);
+    } else {
+      console.error("Element with id 'mailBody' not found.");
+    }
+  }
+
   const mailListDrawer = (
-    <div style={{overflow: "hidden", textOverflow:"ellipse", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", wordBreak: "break-all"}}>
+    <div style={{textOverflow:"ellipse", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", wordBreak: "break-all"}}>
       <Toolbar/>
       <Divider/>
       <List>
-        {mailHeaderList.map((data: any, _) => (
-          <ListItem>
+        {mailHeaderList.map((data: any, index: number) => (
+          <ListItem onClick={() => handleMailBody(index)}>
             <ListItemButton>
               <ListItemText primary={data.from} secondary={data.subject}/>
             </ListItemButton>
@@ -109,7 +123,7 @@ function App() {
   return (
     <>
     <Box sx={{display: 'flex'}}>
-      <AppBar position="static" sx={{zIndex:(theme) => theme.zIndex.drawer + 1}}>
+      <AppBar sx={{zIndex:(theme) => theme.zIndex.drawer + 1}}>
         <Toolbar>
         <IconButton
             color="inherit"
@@ -133,6 +147,10 @@ function App() {
       >
         {mailListDrawer}
       </Drawer>
+      <Box>
+        <Toolbar/>
+        <div id="mailBody"></div>
+      </Box>
     </Box>
     <AddAccountDialog open={openAddAccount} onClose={handleCloseAddAccount}/>
     <Box

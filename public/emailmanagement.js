@@ -92,28 +92,28 @@ async function fetchNewEmails(imap, eve) {
             if (!savedEmails.some(email => email.email_id === Number(uid))) {
                 const f = imap.fetch(uid, { bodies: '', struct: true });
                 //body 추출을 위한 test코드
-        /*var f = imap.seq.fetch(box.messages.total + ':*', { bodies: '' });
-        f.on('message', (msg, seqno) => {
-            console.log('Message #%d', seqno);
-            const prefix = `(#${seqno}) `;
-            msg.once('body', (stream, info) => {
-                simpleParser(stream, (parseErr, parsed) => {
-                    if (parseErr) throw parseErr;
-                    console.log(`${prefix}Subject: ${parsed.subject}`);
-                    console.log(`${prefix}From: ${parsed.from.text}`);
-                    console.log(`${prefix}To: ${parsed.to.text}`);
-                    if (parsed.text) {
-                        //console.log(`${prefix}Text body: ${parsed.text}`);
-                    }
-                    if (parsed.html) {
-                        //console.log(`${prefix}HTML body: ${parsed.html}`);
-                    }
-                });
-            });
-            msg.once('attributes', function(attrs) {
-                console.log(prefix + 'Attributes: %d', attrs.uid);
-            });
-        });*/
+                /*var f = imap.seq.fetch(box.messages.total + ':*', { bodies: '' });
+                f.on('message', (msg, seqno) => {
+                    console.log('Message #%d', seqno);
+                    const prefix = `(#${seqno}) `;
+                    msg.once('body', (stream, info) => {
+                        simpleParser(stream, (parseErr, parsed) => {
+                            if (parseErr) throw parseErr;
+                            console.log(`${prefix}Subject: ${parsed.subject}`);
+                            console.log(`${prefix}From: ${parsed.from.text}`);
+                            console.log(`${prefix}To: ${parsed.to.text}`);
+                            if (parsed.text) {
+                                //console.log(`${prefix}Text body: ${parsed.text}`);
+                            }
+                            if (parsed.html) {
+                                //console.log(`${prefix}HTML body: ${parsed.html}`);
+                            }
+                        });
+                    });
+                    msg.once('attributes', function(attrs) {
+                        console.log(prefix + 'Attributes: %d', attrs.uid);
+                    });
+                });*/
                     //console.log(f['boides']);
                 f.once('message', (message,seno) => {
                     let email = {
@@ -187,7 +187,7 @@ async function fetchNewEmails(imap, eve) {
                     console.error('이메일 가져오기 오류:', err);
                 } else {
                     console.log("가져오기 완료");
-                    const mail=rows.map(({sender,subject})=>({from:[sender],subject:[subject]}));
+                    const mail=rows.map(({sender,subject,body})=>({from:[sender],subject:[subject],body:[body]}));
                     console.log(mail);
                     eve.sender.send('getMailListReply', mail);
                 }
