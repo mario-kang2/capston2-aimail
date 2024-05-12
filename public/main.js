@@ -1,9 +1,7 @@
-const {app, BrowserWindow, ipcMain} = require('electron');
+const {app, BrowserWindow, ipcMain, shell} = require('electron');
 const path = require('path');
 const url = require('url');
 const sqlite3 = require('sqlite3');
-const crypto = require('crypto');
-const { escape } = require('querystring');
 const management = require("./emailmanagement");
 
 const db = new sqlite3.Database("./mail.db");
@@ -24,8 +22,14 @@ function createWindow() {
         slashes: true
     });
 
+    win.webContents.on('new-window', function(e, url) {
+        e.preventDefault();
+        shell.openExternal(url);
+    })
+
     win.loadURL(startUrl);
     win.webContents.openDevTools();
+
     management.setupDatabase();
 }
 
@@ -110,4 +114,8 @@ ipcMain.on('getMailList', (eve, args) => {
 });
 
 // 계정 정보 삭제
-
+ipcMain.on('removeAccount', (eve, args) => {
+    db.run('DELETE FROM mail_account WHERE description = ?', [args.description], err => {
+        eve.sender.send('removeAccountReply', err);
+    })
+})

@@ -1,15 +1,19 @@
 import { AppBar, Box, Container, Divider, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Stack, Toolbar, Typography } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import React, { useEffect } from 'react';
-import AddAccountDialog from './AddAccountDialog'
-import { Add } from '@mui/icons-material';
+
+import { Add, ManageAccounts } from '@mui/icons-material';
 import { createRoot } from 'react-dom/client';
+
+import AddAccountDialog from './AddAccountDialog'
+import AccountManageDialog from './AccountManageDialog';
 
 const drawerWidth = 240;
 
 function App() {
 
   const [openAddAccount, setOpenAddAccount] = React.useState(false);
+  const [openAccountManage, setOpenAccountManage] = React.useState(false);
   const [openDrawer, setOpenDrawer] = React.useState(false);
 
   const [accountData, setAccountData] = React.useState([]);
@@ -19,6 +23,8 @@ function App() {
   const [mailBodyFrom, SetMailBodyFrom] = React.useState("");
   const [mailBodyTitle, SetMailBodyTitle] = React.useState("");
   const [mailBodyTimes, SetMailBodyTimes] = React.useState("");
+
+  const {ipcRenderer} = window.require("electron");
   // 메일 계정 데이터 확인 후 없으면 계정 등록 Dialog 호출
   // 메일 계정 데이터가 있으면 각 계정당 메일 목록 가져오기
   useEffect(() => {
@@ -53,6 +59,18 @@ function App() {
 
   const handleCloseAddAccount = () => {
     setOpenAddAccount(false);
+    ipcRenderer.send("lookupAccountDatabase");
+        ipcRenderer.once('lookupAccountDatabaseReply', (eve:any, res:any) => {
+          setAccountData(res);
+      });
+  };
+
+  const handleCloseAccountManage = () => {
+    setOpenAccountManage(false);
+    ipcRenderer.send("lookupAccountDatabase");
+        ipcRenderer.once('lookupAccountDatabaseReply', (eve:any, res:any) => {
+          setAccountData(res);
+      });
   };
 
   const handleDrawerToggle = () => {
@@ -67,6 +85,34 @@ function App() {
     if (!openDrawer) {
       setOpenDrawer(false);
     }
+  }
+
+  const handleMailList = (index: number) => {
+    ipcRenderer.send("getMailList", accountData[index]);
+    ipcRenderer.once('getMailListReply', (eve:any, res:any) => {
+      console.log("show start");
+      var a: any = []
+      console.log(res);
+      res.forEach((element: any) => {
+        console.log(element);
+        let headerJson = element;
+        console.log(headerJson);
+        a.push(headerJson);
+      });
+      a.reverse();
+      setMailHeaderList(a);
+      ipcRenderer.removeAllListeners('getMailListReply');
+    })
+    const bodyElement = document.getElementById('mailBody');
+    if (bodyElement) {
+      let bodyDOM = createRoot(bodyElement);
+      let body = <div></div>
+      bodyDOM.render(body)
+    }
+    SetMailBodyFrom("")
+    SetMailBodyTitle("")
+    SetMailBodyTimes("")
+    handleDrawerClose()
   }
 
   const handleMailBody = (index: number) => {
@@ -90,7 +136,7 @@ function App() {
 
       // From
       let from = mailHeaderList[index]["from"][0] as string;
-      let fromRegex = /\"([^]*)\" <([^ ]*)>/i
+      let fromRegex = /"([^]*)" <([^ ]*)>/i
       if (fromRegex.test(from)) {
         from = from.replace(fromRegex, "$1");
       }
@@ -116,7 +162,7 @@ function App() {
         {mailHeaderList.map((data: any, index: number) => (
           <ListItem onClick={() => handleMailBody(index)}>
             <ListItemButton>
-              <ListItemText primary={data.from[0].replace(/\"([^]*)\" <([^ ]*)>/i, "$1")} secondary={data.subject} primaryTypographyProps={{noWrap: true}} secondaryTypographyProps={{noWrap: true}}/>
+              <ListItemText primary={data.from[0].replace(/"([^]*)" <([^ ]*)>/i, "$1")} secondary={data.subject} primaryTypographyProps={{noWrap: true}} secondaryTypographyProps={{noWrap: true}}/>
             </ListItemButton>
           </ListItem>
         ))}
@@ -132,18 +178,18 @@ function App() {
       <List>
         {accountData.map((account: any, index) => (
           <ListItem key={account.id} disablePadding>
-            <ListItemButton>
+            <ListItemButton onClick={() => handleMailList(index)}>
               <ListItemText primary={account.description} secondary={account.mailEmail}/>
             </ListItemButton>
           </ListItem>
         ))}
         <Divider/>
         <ListItem>
-          <ListItemButton onClick={() => setOpenAddAccount(true)}>
+          <ListItemButton onClick={() => setOpenAccountManage(true)}>
             <ListItemIcon>
-              <Add/>
+              <ManageAccounts/>
             </ListItemIcon>
-            <ListItemText primary="Add Account"/>
+            <ListItemText primary="Manage Account"/>
           </ListItemButton>
         </ListItem>
       </List>
@@ -194,8 +240,8 @@ function App() {
       </Box>
       </Container>
     </Box>
-
     <AddAccountDialog open={openAddAccount} onClose={handleCloseAddAccount}/>
+    <AccountManageDialog open={openAccountManage} onClose={handleCloseAccountManage}/>
     <Box
       component="nav"
       sx={{ width: {sm: drawerWidth}, flexShrink: {sm: 0}}}
