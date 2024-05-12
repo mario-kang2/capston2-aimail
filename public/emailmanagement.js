@@ -39,7 +39,6 @@ function checkDatabase(table) {
                 console.error('Error while accessing database:', err.message);
                 return;
             }
-            console.log('Database row:', row);
         });
     });
 
@@ -139,18 +138,22 @@ async function fetchNewEmails(imap, eve) {
                                             reject(err2);
                                             return;
                                         }
-
+                                        email.times = mail.date.toISOString();
                                         email.subject = mail.subject || '';
                                         email.sender = mail.from.text || '';
                                         console.log(typeof (mail.to.text || ''));
                                         email.recipient = (mail.to.text || '').toString();
 
                                         email.attachments = mail.attachments.length > 0;
+                                        // Mail Text 구분을 위해 Prefix 삽입
                                         if (mail.text) {
                                             email.body = mail.text || '';
+                                            email.body = 'PLAIN\r\n\r\n' + email.body;
+                                            
                                         }
                                         if (mail.html) {
                                             email.body = mail.html || '';
+                                            email.body = 'HTML\r\n\r\n' + email.body;
                                         }
                                         resolve();
                                     });
@@ -165,7 +168,7 @@ async function fetchNewEmails(imap, eve) {
                         })
                     ]).then(() => {
                         // body와 attributes 이벤트 핸들러가 모두 완료되면 이메일을 데이터베이스에 저장
-                        db.run(`INSERT INTO emails (email_id, address_id, subject, sender, recipient, label, body, times, attachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                       db.run(`INSERT INTO emails (email_id, address_id, subject, sender, recipient, label, body, times, attachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                             [email.uid, imap._config.user, email.subject, email.sender, email.recipient, 0, email.body, email.times, email.attachments], (insertErr) => {
                                 if (insertErr) {
                                     console.error('이메일 저장 오류:', insertErr);
@@ -187,8 +190,7 @@ async function fetchNewEmails(imap, eve) {
                     console.error('이메일 가져오기 오류:', err);
                 } else {
                     console.log("가져오기 완료");
-                    const mail=rows.map(({sender,subject,body})=>({from:[sender],subject:[subject],body:[body]}));
-                    console.log(mail);
+                    const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
                     eve.sender.send('getMailListReply', mail);
                 }
             });

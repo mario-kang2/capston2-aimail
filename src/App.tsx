@@ -1,4 +1,4 @@
-import { AppBar, Box, Divider, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography } from '@mui/material';
+import { AppBar, Box, Container, Divider, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Stack, Toolbar, Typography } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import React, { useEffect } from 'react';
 import AddAccountDialog from './AddAccountDialog'
@@ -15,7 +15,10 @@ function App() {
   const [accountData, setAccountData] = React.useState([]);
 
   const [mailHeaderList, setMailHeaderList] = React.useState([]);
-  const [mailBody, SetMailBody] = React.useState("");
+
+  const [mailBodyFrom, SetMailBodyFrom] = React.useState("");
+  const [mailBodyTitle, SetMailBodyTitle] = React.useState("");
+  const [mailBodyTimes, SetMailBodyTimes] = React.useState("");
   // 메일 계정 데이터 확인 후 없으면 계정 등록 Dialog 호출
   // 메일 계정 데이터가 있으면 각 계정당 메일 목록 가져오기
   useEffect(() => {
@@ -70,12 +73,39 @@ function App() {
     const bodyElement = document.getElementById('mailBody');
     if (bodyElement) {
       let bodyDOM = createRoot(bodyElement);
-      
-      let body = <div dangerouslySetInnerHTML={{__html: mailHeaderList[index]["body"]}}></div>;
+      let mailText = mailHeaderList[index]["body"][0] as string;
+      if (mailText.startsWith("PLAIN\r\n\r\n")) { // Plain Text Mail
+        mailText = mailText.replace("PLAIN\r\n\r\n", "");
+        let regex = /\n/gi;
+        mailText = mailText.replace(regex, " <br>")
+        let urlRegex = /(https?:\/\/[^ ]*)/gi;
+        mailText = mailText.replace(urlRegex, "<a href=\"$&\">$&</a>")
+      }
+      else { // HTML Mail
+        mailText = mailText.replace("HTML\r\n\r\n", "");
+      }
+
+      let body = <div style={{wordBreak: 'break-all'}} dangerouslySetInnerHTML={{__html: mailText}}></div>;
       bodyDOM.render(body);
+
+      // From
+      let from = mailHeaderList[index]["from"][0] as string;
+      let fromRegex = /\"([^]*)\" <([^ ]*)>/i
+      if (fromRegex.test(from)) {
+        from = from.replace(fromRegex, "$1");
+      }
+      SetMailBodyFrom(from)
+      SetMailBodyTitle(mailHeaderList[index]["subject"])
+
+      // Times
+      let isoTimeString = mailHeaderList[index]["times"];
+      let date = new Date(isoTimeString);
+      let formattedDate = date.toLocaleDateString() + " " + date.toLocaleTimeString();
+      SetMailBodyTimes(formattedDate)
     } else {
       console.error("Element with id 'mailBody' not found.");
     }
+    
   }
 
   const mailListDrawer = (
@@ -86,7 +116,7 @@ function App() {
         {mailHeaderList.map((data: any, index: number) => (
           <ListItem onClick={() => handleMailBody(index)}>
             <ListItemButton>
-              <ListItemText primary={data.from} secondary={data.subject}/>
+              <ListItemText primary={data.from[0].replace(/\"([^]*)\" <([^ ]*)>/i, "$1")} secondary={data.subject} primaryTypographyProps={{noWrap: true}} secondaryTypographyProps={{noWrap: true}}/>
             </ListItemButton>
           </ListItem>
         ))}
@@ -147,11 +177,24 @@ function App() {
       >
         {mailListDrawer}
       </Drawer>
-      <Box>
+      <Container fixed>
+      <Box sx={{p:2}}>
         <Toolbar/>
+        <Box sx={{p:2}}>
+          <Stack direction="row">
+            <Typography gutterBottom variant="subtitle1" noWrap sx={{flexGrow: 1}}>{mailBodyFrom}</Typography>
+            <Typography gutterBottom variant="subtitle2" noWrap>{mailBodyTimes}</Typography>
+          </Stack>
+          <Typography gutterBottom variant="subtitle2" noWrap>{mailBodyTitle}</Typography>
+        </Box>
+        <Divider/>
+        <Box sx={{p:2}}>
         <div id="mailBody"></div>
+        </Box>
       </Box>
+      </Container>
     </Box>
+
     <AddAccountDialog open={openAddAccount} onClose={handleCloseAddAccount}/>
     <Box
       component="nav"
