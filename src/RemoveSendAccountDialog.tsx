@@ -2,13 +2,13 @@ import { Add, Remove } from "@mui/icons-material";
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, FormControl, InputLabel, List, ListItem, ListItemButton, ListItemIcon, ListItemText, MenuItem, Select, SelectChangeEvent, Stack, TextField } from "@mui/material";
 import { useEffect, useState } from "react";
 
-export interface RemoveAccountProps {
+export interface RemoveSendAccountProps {
     open: boolean;
     onClose: () => void;
     accountName: string;
 }
 
-export default function RemoveAccountDialog(props: RemoveAccountProps) {
+export default function RemoveSendAccountDialog(props: RemoveSendAccountProps) {
     const {open, onClose, accountName} = props; 
     const {ipcRenderer} = window.require("electron");
 
@@ -17,7 +17,7 @@ export default function RemoveAccountDialog(props: RemoveAccountProps) {
     }
 
     const handleRemoveAccount = () => {
-        ipcRenderer.send("removeAccount", {
+        ipcRenderer.send("removeSendAccount", {
             description: accountName
         });
         onClose();

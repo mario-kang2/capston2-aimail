@@ -53,13 +53,20 @@ app.on('activate', () => {
 // 계정 정보 테이블 생성
 ipcMain.on('createAccountDatabase', (_) => {
     db.run('CREATE TABLE IF NOT EXISTS mail_account ([id] integer primary key autoincrement, [description] text, [mailHost] text, [mailPort] int, [mailSecurity] text, [mailUsername] text, [mailEmail] text, [mailPassword] text);', err => {});
+    db.run('CREATE TABLE IF NOT EXISTS mail_send_account ([id] integer primary key autoincrement, [description] text, [mailHost] text, [mailPort] int, [mailSecurity] text, [mailUsername] text, [mailEmail] text, [mailPassword] text);', err => {});
 })
 
-// 계정 정보 테이블 일회성 조회
+// 계정 정보 테이블 조회
 ipcMain.on('lookupAccountDatabase', (eve) => {
     db.all('SELECT * FROM mail_account', (err, rows) => {
         eve.sender.send('lookupAccountDatabaseReply', rows);
     });
+})
+// 보내는 계정 정보 테이블 조회
+ipcMain.on('lookupSendAddressDatabase', (eve) => {
+    db.all('SELECT * FROM mail_send_account', (err, rows) => {
+        eve.sender.send('lookupSendAccountDatabaseReply', rows);
+    })
 })
 
 // IMAP 유효성 검사
@@ -85,14 +92,46 @@ ipcMain.on('validateImap', (eve, args) => {
 
     imap.connect();
 })
-// POP3 유효성 검사
 
 // SMTP 유효성 검사
+ipcMain.on('validateSmtp', (eve, args) => {
+    const Smtp = require('nodemailer');
+    const log = require('electron-log');
+    const smtp = Smtp.createTransport({
+        host: args.host,
+        port: args.port,
+        secure: args.tls,
+        auth: {
+            user: args.user,
+            pass: args.pass
+        }
+    });
+
+    log.info(args);
+
+    smtp.verify(function (err, success) {
+
+        if (err) {
+            log.error(err);
+            eve.sender.send('validateSmtpReply', false);
+        } else {
+            log.info(success)
+            eve.sender.send('validateSmtpReply', true);
+        }
+    });
+})
 
 // 계정 정보 추가 
 ipcMain.on('addAccount', (eve, args) => {
     db.run('INSERT INTO mail_account (description, mailHost, mailPort, mailSecurity, mailUsername, mailEmail, mailPassword) VALUES (?, ?, ?, ?, ?, ?, ?)', [args.description, args.host, args.port, args.security, args.username, args.emailAddress, args.password], err => {
         eve.sender.send('addAccountReply', err);
+    });
+});
+
+// 보내는 계정 정보 추가 
+ipcMain.on('addSendAccount', (eve, args) => {
+    db.run('INSERT INTO mail_send_account (description,mailHost,mailPort,mailSecurity,mailUsername,mailEmail,mailPassword) VALUES (?, ?, ?, ?, ?, ?, ?)', [args.description, args.host, args.port, args.security, args.username, args.emailAddress, args.password], err => {
+        eve.sender.send('addSendAccountReply', err);
     });
 });
 
@@ -117,5 +156,12 @@ ipcMain.on('getMailList', (eve, args) => {
 ipcMain.on('removeAccount', (eve, args) => {
     db.run('DELETE FROM mail_account WHERE description = ?', [args.description], err => {
         eve.sender.send('removeAccountReply', err);
+    })
+})
+
+// 보내는 계정 정보 삭제
+ipcMain.on('removeSendAccount', (eve, args) => {
+    db.run('DELETE FROM mail_send_account WHERE description = ?', [args.description], err => {
+        eve.sender.send('removeSendAccountReply', err);
     })
 })
