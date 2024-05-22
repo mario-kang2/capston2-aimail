@@ -1,4 +1,3 @@
-import { Description } from "@mui/icons-material";
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Select, SelectChangeEvent, TextField } from "@mui/material";
 import { useState } from "react";
 
@@ -111,7 +110,6 @@ export default function AddSendAccountDialog(props: AddSendAccountDialogProps) {
             setPasswordError(true);
             return;
         }
-        console.log("Validation");
         ipcRenderer.send("validateSmtp", {
             host: host,
             port: port,

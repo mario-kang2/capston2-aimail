@@ -12,7 +12,8 @@ function createWindow() {
         height:768,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false
+            contextIsolation: false,
+            devTools: true
         }
     });
 
@@ -96,7 +97,6 @@ ipcMain.on('validateImap', (eve, args) => {
 // SMTP 유효성 검사
 ipcMain.on('validateSmtp', (eve, args) => {
     const Smtp = require('nodemailer');
-    const log = require('electron-log');
     const smtp = Smtp.createTransport({
         host: args.host,
         port: args.port,
@@ -107,15 +107,11 @@ ipcMain.on('validateSmtp', (eve, args) => {
         }
     });
 
-    log.info(args);
-
     smtp.verify(function (err, success) {
 
         if (err) {
-            log.error(err);
             eve.sender.send('validateSmtpReply', false);
         } else {
-            log.info(success)
             eve.sender.send('validateSmtpReply', true);
         }
     });
@@ -137,10 +133,7 @@ ipcMain.on('addSendAccount', (eve, args) => {
 
 // 메일 목록 조회 (IMAP)
 ipcMain.on('getMailList', (eve, args) => {
-    const log = require('electron-log');
-
     const Imap = require('node-imap');
-    const inspect = require('util').inspect;
     const imap = new Imap({
         user: args.mailEmail,
         password: args.mailPassword,
@@ -164,4 +157,53 @@ ipcMain.on('removeSendAccount', (eve, args) => {
     db.run('DELETE FROM mail_send_account WHERE description = ?', [args.description], err => {
         eve.sender.send('removeSendAccountReply', err);
     })
+})
+
+// 메일 전송
+ipcMain.on('sendMail', (eve, args) => {
+
+    const log = require('electron-log');
+    // 인증 정보 불러오기
+    let from = args.from;
+    let to = args.to;
+    let cc = args.cc;
+    let bcc = args.bcc;
+    let subject = args.subject;
+    let content = args.content;
+
+    db.get('SELECT * FROM mail_send_account WHERE mailEmail = ?', [from], (err, row) => {
+        if (row) {
+            const Smtp = require('nodemailer');
+            const smtp = Smtp.createTransport({
+                host: row.mailHost,
+                port: row.mailPort,
+                secure: row.mailSecurity === 'ssl',
+                auth: {
+                    user: row.mailEmail,
+                    pass: row.mailPassword
+                }
+            });
+
+            log.info(smtp);
+
+            let mailOptions = {
+                from: from,
+                to: to,
+                cc: cc,
+                bcc: bcc,
+                subject: subject,
+                text: content
+            };
+
+            smtp.sendMail(mailOptions, (err, info) => {
+                if (err) {
+                    log.error(err);
+                    eve.sender.send('sendMailReply', false);
+                } else {
+                    log.info(info);
+                    eve.sender.send('sendMailReply', true);
+                }
+            });
+        }
+    });
 })

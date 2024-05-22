@@ -157,7 +157,6 @@ export default function AddAccountDialog(props: AddAccountDialogProps) {
             setPasswordError(true);
             return;
         }
-        console.log("Validation");
         if (protocol === "imap") {
             ipcRenderer.send("validateImap", {
                 host: host,
@@ -167,10 +166,7 @@ export default function AddAccountDialog(props: AddAccountDialogProps) {
                 password: password
             });
             ipcRenderer.once('validateImapReply', (eve:any, res:any) => {
-                console.log(res);
                 if (res === true) {
-                    
-
                     ipcRenderer.send("addAccount", {
                         description: description,
                         host: host,

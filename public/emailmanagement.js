@@ -90,30 +90,6 @@ async function fetchNewEmails(imap, eve) {
 
             if (!savedEmails.some(email => email.email_id === Number(uid))) {
                 const f = imap.fetch(uid, { bodies: '', struct: true });
-                //body 추출을 위한 test코드
-                /*var f = imap.seq.fetch(box.messages.total + ':*', { bodies: '' });
-                f.on('message', (msg, seqno) => {
-                    console.log('Message #%d', seqno);
-                    const prefix = `(#${seqno}) `;
-                    msg.once('body', (stream, info) => {
-                        simpleParser(stream, (parseErr, parsed) => {
-                            if (parseErr) throw parseErr;
-                            console.log(`${prefix}Subject: ${parsed.subject}`);
-                            console.log(`${prefix}From: ${parsed.from.text}`);
-                            console.log(`${prefix}To: ${parsed.to.text}`);
-                            if (parsed.text) {
-                                //console.log(`${prefix}Text body: ${parsed.text}`);
-                            }
-                            if (parsed.html) {
-                                //console.log(`${prefix}HTML body: ${parsed.html}`);
-                            }
-                        });
-                    });
-                    msg.once('attributes', function(attrs) {
-                        console.log(prefix + 'Attributes: %d', attrs.uid);
-                    });
-                });*/
-                    //console.log(f['boides']);
                 f.once('message', (message,seno) => {
                     let email = {
                         uid: 0,
@@ -134,14 +110,12 @@ async function fetchNewEmails(imap, eve) {
                                 stream.once('end', () => {
                                     simpleParser(buffer, (err2, mail) => {
                                         if (err2) {
-                                            console.log('Read mail executor error .....', err2);
                                             reject(err2);
                                             return;
                                         }
                                         email.times = mail.date.toISOString();
                                         email.subject = mail.subject || '';
                                         email.sender = mail.from.text || '';
-                                        console.log(typeof (mail.to.text || ''));
                                         email.recipient = (mail.to.text || '').toString();
 
                                         email.attachments = mail.attachments.length > 0;
@@ -170,11 +144,6 @@ async function fetchNewEmails(imap, eve) {
                         // body와 attributes 이벤트 핸들러가 모두 완료되면 이메일을 데이터베이스에 저장
                        db.run(`INSERT INTO emails (email_id, address_id, subject, sender, recipient, label, body, times, attachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                             [email.uid, imap._config.user, email.subject, email.sender, email.recipient, 0, email.body, email.times, email.attachments], (insertErr) => {
-                                if (insertErr) {
-                                    console.error('이메일 저장 오류:', insertErr);
-                                } else {
-                                    console.log('이메일 저장 완료:', email.subject);
-                                }
                             });
                     }).catch((error) => {
                         console.error('이메일 처리 오류:', error);
@@ -182,14 +151,11 @@ async function fetchNewEmails(imap, eve) {
                 });
             }
         }
-        console.log('저장 끝');
         imap.end();
         imap.once('end', function() {
             getSavedEmails(imap._config.user, (err, rows) => {
                 if (err) {
-                    console.error('이메일 가져오기 오류:', err);
                 } else {
-                    console.log("가져오기 완료");
                     const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
                     eve.sender.send('getMailListReply', mail);
                 }
