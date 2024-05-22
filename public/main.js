@@ -157,6 +157,20 @@ ipcMain.on('removeSendAccount', (eve, args) => {
         eve.sender.send('removeSendAccountReply', err);
     })
 })
+ipcMain.on('searchMaillist', (eve, args) => {
+    const column=args.searchBy;
+    const value=args.query;
+    management.searchbytype(column,value, (err, rows) => {
+        if (err) {
+            console.error('이메일 검색 오류:', err);
+        } else {
+            console.log("검색완료");
+            console.log(rows)
+            const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
+            eve.sender.send('searchMailListReply', mail);
+        }
+    })
+})
 
 // 메일 삭제
 ipcMain.on('deleteMail', (eve, args) => {
@@ -233,6 +247,19 @@ ipcMain.on('sendMail', (eve, args) => {
                     eve.sender.send('sendMailReply', true);
                 }
             });
+        }
+    });
+})
+ipcMain.on('searchMail', (eve, searchBy,query) => {
+    const type=searchBy;
+    const value=query;
+    management.searchbytype(type,value, (err, rows) => {
+        if (err) {
+            console.error('이메일 가져오기 오류:', err);
+        } else {
+            console.log("가져오기 완료");
+            const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
+            eve.sender.send('searchMailReply', mail);
         }
     });
 })

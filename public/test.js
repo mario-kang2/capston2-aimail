@@ -1,0 +1,50 @@
+const cheerio = require('cheerio');
+
+const OpenAI = require("openai");
+var inspect = require('util').inspect;
+
+const html='<table width="" cellpadding="0" cellspacing="10">                                                                                                                                                                                                              <tr>                                                                                                                                                                                                                                                           <td style="padding:10px; background-color:#fff; border:10px solid #eef9f9;">                                                                                                                                                                                   <table width="600" cellpadding="0" cellspacing="0" border="0"">                                                                                                                                                                                                <tr>                                                                                                                                                                                                                                                           <td colspan="2" style="padding:0px 0px 10px 0px;">                                                                                                                                                                                                             <img src="http://mail.ssu.ac.kr/images/sangdam/sangdam_logo.gif"></td>                                                                                                                                                                                         </tr>                                                                                                                                                                                                                                                          <tr>                                                                                                                                                                                                                                                           <td width="50" style="font:bold 12px \'Malgun Gothic\'; color:#000; background-color:#e5f6f9; border-top: 1px solid #00678f; padding:5px; text-align:center;">수신</td>                                                                                            <td width="550" style="font:12px \'Malgun Gothic\'; color:#000; border-top: 1px solid #00678f; padding:5px;">유진영 (yjy61224@naver.com)</td>                                                                                                                       </tr>                                                                                                                                                                                                                                                          <tr>                                                                                                                                                                                                                                                           <td width="50" style="font:bold 12px \'Malgun Gothic\'; color:#000; background-color:#e5f6f9; border-top: 1px solid #00678f; border-bottom: 2px solid #00678f; padding:5px; text-align:center;">제목</td>                                                          <td width="550" style="font:12px \'Malgun Gothic\'; color:#000; border-top: 1px solid #00678f; border-bottom: 2px solid #00678f; padding:5px;">진로지도 상담에서 유진영 학생에게 보낸 메세지 입니다.</td>                                                                               </tr>                                                                                                                                                                                                                                                          <tr>                                                                                                                                                                                                                                                           <td colspan="2" style="font:12px \'Malgun Gothic\'; color:#000; padding:10px; height:300px; vertical-align:top;">                                                                                                                                                <br>진로지도 상담을 담당하는 이상호 교수입니다.   <br>재학생은 매학기 진로지도 상담을 하여야 하는데,  <br>본 메일을 받은 학생은 이번 학기에 나에게 배정된 학생입니다.   <br><br>상담은 우선 전자메일로 진행하며, <br>본 메일에 상담내용을 회신하면 내가 답변을 하며, <br>상담내용이 없으면 &quot;상담내용없음&quot;으로                                                          회신하면 상담을 완료한 것으로 처리합니다.  <br><br>상담 내용을 따라 필요하다면 대면 또는 줌 상담도 가능합니다.    <br><br>--- 이상호 교수                                                                                                                                                                      </td>                                                                                                                                                                                                                                                          </tr>                                                                                                                                                                                                                                                          <tr>                                                                                                                                                                                                                                                           <td width="100%" colspan="2" style="font:11px \'Malgun Gothic\'; letter-spacing: 0px; line-height: 120%; color:#666; border-top: 2px solid #00678f; padding:10px 0px 0px 0px;">                                                                                  ※본 메일은 발신전용 메일이므로 회신이 되지 않습니다.                                                                                                                                                                                                                                 <BR><BR>                                                                                                                                                                                                                                                       06978 서울시 동작구 상도로 369 숭실대학교 Tel:02-820-0114 E-Mail:webmaster@ssu.ac.kr<br>Copyright (c) 2010 Soongsil University. All Rights Reserved.                                                                                                                         </td>                                                                                                                                                                                                                                                          </tr>                                                                                                                                                                                                                                                          </table>                                                                                                                                                                                                                                                       </td>                                                                                                                                                                                                                                                          </tr>                                                                                                                                                                                                                                                          </table>\n'
+const allText=emailBodyToText(html)
+console.log('alltext: '+allText +"\n length:"+allText.length);
+require('dotenv').config();
+//summarizebyopenai(allText);
+async function summarizebyopenai(text){
+    const openai = new OpenAI({apiKey:''});
+    const textToSummarize = text+'\n 요약해줘';
+    const response = await openai.chat.completions.create({
+        messages: [{"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": textToSummarize}],
+        model: "gpt-3.5-turbo",
+    });
+
+    console.log(response.choices[0]);
+}
+function emailBodyToText(body){
+    let allText=body;
+    if (allText.startsWith("PLAIN\r\n\r\n")) { // Plain Text Mail
+        allText = allText.replace("PLAIN\r\n\r\n", "");
+        let regex = /\n/gi;
+        allText = allText.replace(regex, " <br>")
+        let urlRegex = /(https?:\/\/[^ ]*)/gi;
+        allText = allText.replace(urlRegex, "<a href=\"$&\">$&</a>")
+    }
+    else { // HTML Mail
+        allText = allText.replace("HTML\r\n\r\n", "");
+    }
+    const $ = cheerio.load(allText);
+    const uniqueTexts = {};
+    $('*').each((index, ele) => {
+        const text = $(ele).clone()          // 요소의 복사본을 만듭니다
+            .children()       // 자식 요소를 선택합니다
+            .remove()         // 자식 요소를 제거합니다
+            .end()            // 복사본을 반환합니다
+            .text()           // 텍스트를 추출합니다
+            .trim();          // 공백을 제거합니다
+        if (text) {
+            uniqueTexts[text] = true;
+        }
+    });
+// 중복을 제거한 텍스트를 하나의 문자열로 합칩니다
+    const text = Object.keys(uniqueTexts).join('\n ');
+    return text;
+}
