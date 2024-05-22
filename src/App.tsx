@@ -419,13 +419,13 @@ function App() {
             </IconButton>
           </Tooltip>
           <Tooltip title="Get New Message">
-            <IconButton>
+            <IconButton
               color="inherit"
               aria-label="send message" onClick={handleSendMailButton}>
               <Send/>
             </IconButton>
           </Tooltip>
-          <Tooltip title="Delete Message"></Tooltip>
+          <Tooltip title="Delete Message">
             <IconButton
               color="inherit"
               aria-label="delete message" onClick={handleDeleteMailButton}>
