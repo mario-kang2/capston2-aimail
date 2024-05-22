@@ -141,7 +141,6 @@ ipcMain.on('getMailList', (eve, args) => {
         port: args.mailPort,
         tls: args.mailSecurity === 'ssl' || args.mailSecurity === 'starttls'
     });
-
     management.fetchNewEmails(imap,eve);
 });
 
@@ -158,6 +157,36 @@ ipcMain.on('removeSendAccount', (eve, args) => {
         eve.sender.send('removeSendAccountReply', err);
     })
 })
+
+// 메일 삭제
+ipcMain.on('deleteMail', (eve, args) => {
+    const Imap = require('node-imap');
+    const imap = new Imap({
+        user: args.auth.mailEmail,
+        password: args.auth.mailPassword,
+        host: args.auth.mailHost,
+        port: args.auth.mailPort,
+        tls: args.auth.mailSecurity === 'ssl' || args.auth.mailSecurity === 'starttls',
+    });
+    const uid = args.index[0].toString();
+    imap.once('ready', () => {
+        imap.openBox('INBOX', false, (err, box) => {
+            if (err) {
+                eve.sender.send('deleteMailReply', false);
+            } else {
+                imap.addFlags(uid, '\\Deleted', (err) => {
+                    if (err) {
+                        eve.sender.send('deleteMailReply', false);
+                    } else {
+                        imap.end();
+                        eve.sender.send('deleteMailReply', true);
+                    }
+                });
+            }
+        });
+    });
+    imap.connect();
+});
 
 // 메일 전송
 ipcMain.on('sendMail', (eve, args) => {

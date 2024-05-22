@@ -29,11 +29,13 @@ function App() {
   const [mailBodyTimes, SetMailBodyTimes] = React.useState("");
 
   const [selectedIndex, SetSelectedIndex] = React.useState(0);
+  const [selectedMailIndex, SetSelectedMailIndex] = React.useState(-1);
 
   const {ipcRenderer} = window.require("electron");
 
   const [mailLoadedSnackbarOpen, setMailLoadedSnackbarOpen] = React.useState(false);
   const [mailSentSnackbarOpen, setMailSentSnackbarOpen] = React.useState(false);
+  const [mailDeletedSnackbarOpen, setMailDeletedSnackbarOpen] = React.useState(false);
 
   // 앱 실행 시 동작
   // 메일 계정 데이터 확인 후 없으면 계정 등록 Dialog 호출
@@ -142,11 +144,13 @@ function App() {
     SetMailBodyFrom("")
     SetMailBodyTitle("")
     SetMailBodyTimes("")
+    SetSelectedMailIndex(-1)
     handleDrawerClose()
   }
 
   // 메일 본문 렌더링
   const handleMailBody = (index: number) => {
+    SetSelectedMailIndex(index);
     const bodyElement = document.getElementById('mailBody');
     if (bodyElement) {
       let bodyDOM = createRoot(bodyElement);
@@ -238,6 +242,25 @@ function App() {
     </React.Fragment>
   )
 
+  // 메일 삭제했음 Snackbar 닫기 동작
+  const handleMailDeletedSnackbarClosed = () => {
+    setMailDeletedSnackbarOpen(false);
+  }
+
+  // 메일 삭제했음 Snackbar 버튼 목록
+  const mailDeletedSnackbarAction = (
+    <React.Fragment>
+      <IconButton
+      size='small'
+      aria-label="close"
+      color="inherit"
+      onClick={handleMailDeletedSnackbarClosed}
+      >
+        <CloseIcon fontSize='small'/>
+      </IconButton>
+    </React.Fragment>
+  )
+
   // 메일 보내기 버튼 선택 동작
   // 보내는 메일 계정이 없으면 계정 추가 Dialog 호출
   const handleSendMailButton = () => {
@@ -249,6 +272,44 @@ function App() {
     }
   }
 
+  // 메일 삭제 버튼 선택 동작
+  const handleDeleteMailButton = () => {
+    let accountIndex = selectedIndex;
+    let mailIndex = selectedMailIndex;
+    if (mailIndex === -1) {
+      return;
+    }
+    console.log(mailHeaderList[mailIndex]);
+    ipcRenderer.send("deleteMail", {"auth":accountData[accountIndex], "index":mailHeaderList[mailIndex]["uid"]});
+    ipcRenderer.once('deleteMailReply', (eve:any, res:any) => {
+      if (res) {
+        ipcRenderer.send("getMailList", accountData[accountIndex]);
+        ipcRenderer.once('getMailListReply', (eve:any, res:any) => {
+          var a: any = []
+          res.forEach((element: any) => {
+            let headerJson = element;
+            a.push(headerJson);
+          });
+          a.reverse();
+          setMailHeaderList(a);
+          ipcRenderer.removeAllListeners('getMailListReply');
+          const bodyElement = document.getElementById('mailBody');
+          if (bodyElement) {
+            let bodyDOM = createRoot(bodyElement);
+            let body = <div></div>
+            bodyDOM.render(body)
+          }
+          SetMailBodyFrom("")
+          SetMailBodyTitle("")
+          SetMailBodyTimes("")
+          SetSelectedMailIndex(-1)
+          setMailDeletedSnackbarOpen(true);
+        })
+      }
+      ipcRenderer.removeAllListeners('deleteMailReply');
+    })
+  }
+  
   // 메일 목록 Drawer
   const mailListDrawer = (
     <div style={{textOverflow:"ellipse", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", wordBreak: "break-all"}}>
@@ -318,7 +379,7 @@ function App() {
           </IconButton>
           <IconButton
             color="inherit"
-            aria-label="delete message">
+            aria-label="delete message" onClick={handleDeleteMailButton}>
             <Delete/>
           </IconButton>
         </Toolbar>
@@ -389,6 +450,13 @@ function App() {
       message="Mail Sent"
       onClose={handleMailSentSnackbarClosed}
       action={mailSentSnackbarAction}
+      />
+    <Snackbar
+      open={mailDeletedSnackbarOpen}
+      autoHideDuration={3000}
+      message="Mail Deleted"
+      onClose={handleMailDeletedSnackbarClosed}
+      action={mailDeletedSnackbarAction}
       />
     </>
   );

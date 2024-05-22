@@ -72,7 +72,6 @@ async function fetchNewEmails(imap, eve) {
         });
         const savedEmails = await new Promise((resolve, reject) => {
             getSavedEmails(imap._config.user, (err, rows) => {
-
                 if (err) {
                     reject(err);}
                 else resolve(rows);
@@ -85,6 +84,13 @@ async function fetchNewEmails(imap, eve) {
                 else resolve(searchResults);
             });
         });
+
+        // 삭제된 메일 감지 및 DB에서 삭제
+        for (const savedEmail of savedEmails) {
+            if (!searchResults.some(uid => uid === savedEmail.email_id)) {
+                db.run('DELETE FROM emails WHERE email_id = ?', [savedEmail.email_id]);
+            }
+        }
 
         for (const uid of searchResults) {
 
@@ -146,7 +152,6 @@ async function fetchNewEmails(imap, eve) {
                             [email.uid, imap._config.user, email.subject, email.sender, email.recipient, 0, email.body, email.times, email.attachments], (insertErr) => {
                             });
                     }).catch((error) => {
-                        console.error('이메일 처리 오류:', error);
                     });
                 });
             }
@@ -156,13 +161,12 @@ async function fetchNewEmails(imap, eve) {
             getSavedEmails(imap._config.user, (err, rows) => {
                 if (err) {
                 } else {
-                    const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
+                    const mail=rows.map(({email_id,sender,subject,body,times})=>({uid:[email_id],from:[sender],subject:[subject],body:[body],times:[times]}));
                     eve.sender.send('getMailListReply', mail);
                 }
             });
         })
     } catch (err) {
-        console.error('오류:', err);
     }
 }
 
