@@ -1,4 +1,4 @@
-import { AppBar, Box, Container, Divider, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Snackbar, Stack, Toolbar, Typography } from '@mui/material';
+import { AppBar, Box, Container, Divider, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Snackbar, Stack, Toolbar, Tooltip, Typography } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import React, { useEffect } from 'react';
 
@@ -367,21 +367,27 @@ function App() {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{flexGrow: 1}}>Aimail</Typography>
-          <IconButton
-            color="inherit"
-            aria-label="get new message" onClick={handleGetMessageButton}>
-            <Mail/>
-          </IconButton>
-          <IconButton
-            color="inherit"
-            aria-label="send message" onClick={handleSendMailButton}>
-            <Send/>
-          </IconButton>
-          <IconButton
-            color="inherit"
-            aria-label="delete message" onClick={handleDeleteMailButton}>
-            <Delete/>
-          </IconButton>
+          <Tooltip title="Get New Message">
+            <IconButton
+              color="inherit"
+              aria-label="get new message" onClick={handleGetMessageButton}>
+              <Mail/>
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Send Message">
+            <IconButton
+              color="inherit"
+              aria-label="send message" onClick={handleSendMailButton}>
+              <Send/>
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete Message">
+            <IconButton
+              color="inherit"
+              aria-label="delete message" onClick={handleDeleteMailButton}>
+              <Delete/>
+            </IconButton>
+          </Tooltip>
         </Toolbar>
       </AppBar>
       <Drawer
