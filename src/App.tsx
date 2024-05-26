@@ -1,8 +1,9 @@
-import { AppBar, Box, Container, Divider, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Snackbar, Stack, Toolbar, Tooltip, Typography } from '@mui/material';
+import { AppBar, Box, Container, Divider, Drawer, IconButton, InputBase, List, ListItem, ListItemButton, ListItemIcon, ListItemText, MenuItem, Select, Snackbar, Stack, Toolbar, Tooltip, Typography, alpha, styled } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import React, { useEffect } from 'react';
+import SearchIcon from '@mui/icons-material/Search';
+import React, { useCallback, useEffect } from 'react';
 
-import { Add, Delete, Mail, ManageAccounts, Send } from '@mui/icons-material';
+import { Delete, Mail, ManageAccounts, Send } from '@mui/icons-material';
 import CloseIcon from '@mui/icons-material/Close'
 import { createRoot } from 'react-dom/client';
 
@@ -12,6 +13,51 @@ import AddSendAccountDialog from './AddSendAccountDialog';
 import SendMailDialog from './SendMailDialog';
 
 const drawerWidth = 240;
+
+// 검색 바
+// 값 변경 시 focus 잃는 이슈로 function 바깥에 선언
+const Search = styled('div')(({ theme }) => ({
+  position: 'relative',
+  borderRadius: theme.shape.borderRadius,
+  backgroundColor: alpha(theme.palette.common.white, 0.15),
+  '&:hover': {
+    backgroundColor: alpha(theme.palette.common.white, 0.25),
+  },
+  marginLeft: 0,
+  width: '100%',
+  [theme.breakpoints.up('sm')]: {
+    marginLeft: theme.spacing(1),
+    width: 'auto',
+  },
+}));
+
+const SearchIconWrapper = styled('div')(({ theme }) => ({
+  padding: theme.spacing(0, 2),
+  height: '100%',
+  position: 'absolute',
+  pointerEvents: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}));
+
+const StyledInputBase = styled(InputBase)(({ theme }) => ({
+  color: 'inherit',
+  width: '100%',
+  '& .MuiInputBase-input': {
+    padding: theme.spacing(1, 1, 1, 0),
+    // vertical padding + font size from searchIcon
+    paddingLeft: `calc(1em + ${theme.spacing(4)})`,
+    transition: theme.transitions.create('width'),
+    width: '100%',
+    [theme.breakpoints.up('sm')]: {
+      width: '12ch',
+      '&:focus': {
+        width: '20ch',
+      },
+    },
+  },
+}));
 
 function App() {
 
@@ -59,7 +105,6 @@ function App() {
       ipcRenderer.send("getMailList", res[0]);
       ipcRenderer.once('getMailListReply', (eve:any, res:any) => {
         var a: any = []
-        console.log(res);
         res.forEach((element: any) => {
           let headerJson = element;
           a.push(headerJson);
@@ -195,7 +240,6 @@ function App() {
     let index = selectedIndex;
     ipcRenderer.send("getMailList", accountData[index]);
     ipcRenderer.once('getMailListReply', (eve:any, res:any) => {
-      console.log("show start");
       var a: any = []
       res.forEach((element: any) => {
         let headerJson = element;
@@ -283,7 +327,6 @@ function App() {
     if (mailIndex === -1) {
       return;
     }
-    console.log(mailHeaderList[mailIndex]);
     ipcRenderer.send("deleteMail", {"auth":accountData[accountIndex], "index":mailHeaderList[mailIndex]["uid"]});
     ipcRenderer.once('deleteMailReply', (eve:any, res:any) => {
       if (res) {
@@ -330,32 +373,48 @@ function App() {
       </List>
     </div>
   )
-  const handleQueryChange = (event:any) => {
-    setQuery(event.target.value);
-  };
 
-  const handleSearchByChange = (event:any) => {
+  // 검색 필터
+  const SearchFilter = styled(Select)(({ theme }) => ({
+    position: 'relative',
+    borderRadius: theme.shape.borderRadius,
+    backgroundColor: alpha(theme.palette.common.white, 0.15),
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.common.white, 0.25),
+    },
+    marginLeft: 0,
+    width: '100%',
+    [theme.breakpoints.up('sm')]: {
+      marginLeft: theme.spacing(1),
+      width: 'auto',
+    },
+  }));
+
+  // 검색 시 동작
+  const handleQueryChange = useCallback((e:any) => {
+    setQuery(e.target.value);
+  }, [query]);
+
+  const handleSearchByChange = useCallback((event:any) => {
     setSearchBy(event.target.value);
-  };
-  const handleSearch = () => {
-    console.log(query);
-    ipcRenderer.send("searchMail",searchBy,query);
-    ipcRenderer.once('searchMailReply', (eve:any, res:any) => {
-      console.log("show start");
+  }, [searchBy]);
+
+  useEffect(() => {
+    const getResponse = async() => {
+      ipcRenderer.send("searchMail",searchBy,query);
+      ipcRenderer.once('searchMailReply', (eve:any, res:any) => {
       var a: any = []
-      console.log(res);
       res.forEach((element: any) => {
-        console.log(element);
         let headerJson = element;
-        console.log(headerJson);
         a.push(headerJson);
       });
       a.reverse();
       setMailHeaderList(a);
       ipcRenderer.removeAllListeners('getMailListReply');
-      setMailLoadedSnackbarOpen(true);
     })
-  }
+    }
+    getResponse();
+  }, [query, searchBy]);
 
   // 계정 정보 Drawer
   const drawer = (
@@ -397,20 +456,6 @@ function App() {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{flexGrow: 1}}>Aimail</Typography>
-          <div>
-            <select value={searchBy} onChange={handleSearchByChange}>
-              <option value="subject">제목</option>
-              <option value="sender">발신인</option>
-            </select>
-          </div>
-          <div>
-            <input
-                type="text"
-                value={query}
-                onChange={handleQueryChange}
-            />
-            <button onClick={handleSearch}>검색</button>
-          </div>
           <Tooltip title="Get New Message">
             <IconButton
               color="inherit"
@@ -418,7 +463,7 @@ function App() {
               <Mail/>
             </IconButton>
           </Tooltip>
-          <Tooltip title="Get New Message">
+          <Tooltip title="Send Message">
             <IconButton
               color="inherit"
               aria-label="send message" onClick={handleSendMailButton}>
@@ -432,6 +477,26 @@ function App() {
               <Delete/>
             </IconButton>
           </Tooltip>
+          <SearchFilter
+            size="small"
+            value={searchBy}
+            sx={{boxShadow: "none", color: "white", '.MuiOutlinedInput-notchedOutline': {border: 0}}}
+            onChange={handleSearchByChange}
+            style={{position:"relative"}}>
+            <MenuItem value="subject">Subject</MenuItem>
+            <MenuItem value="sender">From</MenuItem>
+          </SearchFilter>
+          <Search>
+            <SearchIconWrapper>
+              <SearchIcon/>
+            </SearchIconWrapper>
+            <StyledInputBase
+              placeholder="Search…"
+              value={query}
+              onChange={handleQueryChange}
+              inputProps={{'aria-label':'search'}}
+            />
+          </Search>
         </Toolbar>
       </AppBar>
       <Drawer

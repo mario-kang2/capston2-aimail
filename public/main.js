@@ -164,8 +164,6 @@ ipcMain.on('searchMaillist', (eve, args) => {
         if (err) {
             console.error('이메일 검색 오류:', err);
         } else {
-            console.log("검색완료");
-            console.log(rows)
             const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
             eve.sender.send('searchMailListReply', mail);
         }
@@ -257,7 +255,6 @@ ipcMain.on('searchMail', (eve, searchBy,query) => {
         if (err) {
             console.error('이메일 가져오기 오류:', err);
         } else {
-            console.log("가져오기 완료");
             const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
             eve.sender.send('searchMailReply', mail);
         }
