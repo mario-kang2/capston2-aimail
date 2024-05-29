@@ -248,6 +248,7 @@ ipcMain.on('sendMail', (eve, args) => {
         }
     });
 })
+
 ipcMain.on('searchMail', (eve, searchBy,query) => {
     const type=searchBy;
     const value=query;

@@ -1,9 +1,9 @@
-import { AppBar, Box, Container, Divider, Drawer, IconButton, InputBase, List, ListItem, ListItemButton, ListItemIcon, ListItemText, MenuItem, Select, Snackbar, Stack, Toolbar, Tooltip, Typography, alpha, styled } from '@mui/material';
+import { AppBar, Box, Button, Container, Divider, Drawer, IconButton, InputBase, List, ListItem, ListItemButton, ListItemIcon, ListItemText, MenuItem, Select, Snackbar, Stack, ToggleButton, Toolbar, Tooltip, Typography, alpha, styled } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import React, { useCallback, useEffect } from 'react';
 
-import { Delete, Mail, ManageAccounts, Send } from '@mui/icons-material';
+import { CalendarMonth, Delete, Mail, ManageAccounts, People, Send, SwapVert } from '@mui/icons-material';
 import CloseIcon from '@mui/icons-material/Close'
 import { createRoot } from 'react-dom/client';
 
@@ -11,6 +11,8 @@ import AddAccountDialog from './AddAccountDialog'
 import AccountManageDialog from './AccountManageDialog';
 import AddSendAccountDialog from './AddSendAccountDialog';
 import SendMailDialog from './SendMailDialog';
+import CalendarDialog from './CalendarDialog';
+import ContactsDialog from './ContactsDialog';
 
 const drawerWidth = 240;
 
@@ -66,6 +68,8 @@ function App() {
   const [openAccountManage, setOpenAccountManage] = React.useState(false);
   const [openDrawer, setOpenDrawer] = React.useState(false);
   const [openSendMail, setOpenSendMail] = React.useState(false);
+  const [openCalendar, setOpenCalendar] = React.useState(false);
+  const [openContacts, setOpenContacts] = React.useState(false);
   const [accountData, setAccountData] = React.useState([]);
   const [sendAccountData, setSendAccountData] = React.useState([]);
   const [mailHeaderList, setMailHeaderList] = React.useState([]);
@@ -84,6 +88,8 @@ function App() {
   const [mailDeletedSnackbarOpen, setMailDeletedSnackbarOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [searchBy, setSearchBy] = React.useState('subject');
+
+  const [mailReverse, setMailReverse] = React.useState(false);
 
   // 앱 실행 시 동작
   // 메일 계정 데이터 확인 후 없으면 계정 등록 Dialog 호출
@@ -231,9 +237,16 @@ function App() {
       let date = new Date(isoTimeString);
       let formattedDate = date.toLocaleString();
       SetMailBodyTimes(formattedDate)
-    }
-    
+    } 
   }
+
+  // 메일 목록 업/다운 토글
+  const handleToggleMailList = () => {
+    setMailReverse(!mailReverse);
+    var a = mailHeaderList;
+    a.reverse();
+    setMailHeaderList(a);
+  };
 
   // 메일 가져오기 버튼 선택 시 동작
   const handleGetMessageButton = () => {
@@ -362,6 +375,13 @@ function App() {
     <div style={{textOverflow:"ellipse", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", wordBreak: "break-all"}}>
       <Toolbar/>
       <Divider/>
+      <Tooltip title="Toggle upward/downward">
+        <IconButton
+          aria-label="toggle upward/downward"
+          onClick={handleToggleMailList}>
+          <SwapVert/>
+        </IconButton>
+      </Tooltip>
       <List>
         {mailHeaderList.map((data: any, index: number) => (
           <ListItem onClick={() => handleMailBody(index)}>
@@ -416,6 +436,26 @@ function App() {
     getResponse();
   }, [query, searchBy]);
 
+  // 캘린더 버튼 선택 시 동작
+  const handleCalendarButton = () => {
+    setOpenCalendar(true);
+  }
+
+  // 캘린더 닫기 동작
+  const handleCloseCalendar = () => {
+    setOpenCalendar(false);
+  }
+
+  // 연락처 버튼 선택 시 동작
+  const handleContactsButton = () => {
+    setOpenContacts(true);
+  }
+
+  // 연락처 닫기 동작
+  const handleCloseContacts = () => {
+    setOpenContacts(false);
+  }
+
   // 계정 정보 Drawer
   const drawer = (
       <div>
@@ -456,6 +496,20 @@ function App() {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{flexGrow: 1}}>Aimail</Typography>
+          <Tooltip title="Contacts">
+            <IconButton
+              color="inherit"
+              aria-label="contacts" onClick={handleContactsButton}>
+              <People/>
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Calendar">
+            <IconButton
+              color="inherit"
+              aria-label="calendar" onClick={handleCalendarButton}>
+              <CalendarMonth/>
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Get New Message">
             <IconButton
               color="inherit"
@@ -522,6 +576,10 @@ function App() {
         </Box>
         <Divider/>
         <Box sx={{p:2}}>
+          <Typography>메일 요약본이 들어갈 위치</Typography>
+        </Box>
+        <Divider/>
+        <Box sx={{p:2}}>
         <div id="mailBody"></div>
         </Box>
       </Box>
@@ -531,6 +589,8 @@ function App() {
     <AddSendAccountDialog open={openAddSendAccount} onClose={handleCloseAddSendAccount}/>
     <AccountManageDialog open={openAccountManage} onClose={handleCloseAccountManage}/>
     <SendMailDialog open={openSendMail} onClose={handleCloseSendMail}/>
+    <CalendarDialog open={openCalendar} onClose={handleCloseCalendar}/>
+    <ContactsDialog open={openContacts} onClose={handleCloseContacts}/>
     <Box
       component="nav"
       sx={{ width: {sm: drawerWidth}, flexShrink: {sm: 0}}}
