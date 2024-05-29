@@ -25,7 +25,6 @@ async function searchbytype(type,values,callback){
             callback(err, null); // 오류가 발생했을 때 콜백에 오류를 전달하고 빈 배열을 반환
             return;
         }
-        console.log(rows);
         const emails = rows || [];
         callback(null,emails);
     });
@@ -87,34 +86,17 @@ async function fetchNewEmails(imap, eve) {
             });
         });
 
+        // 삭제된 메일 감지 및 DB에서 삭제
+        for (const savedEmail of savedEmails) {
+            if (!searchResults.some(uid => uid === savedEmail.email_id)) {
+                db.run('DELETE FROM emails WHERE email_id = ?', [savedEmail.email_id]);
+            }
+        }
+
         for (const uid of searchResults) {
 
             if (!savedEmails.some(email => email.email_id === Number(uid))) {
                 const f = imap.fetch(uid, { bodies: '', struct: true });
-                //body 추출을 위한 test코드
-                /*var f = imap.seq.fetch(box.messages.total + ':*', { bodies: '' });
-                f.on('message', (msg, seqno) => {
-                    console.log('Message #%d', seqno);
-                    const prefix = `(#${seqno}) `;
-                    msg.once('body', (stream, info) => {
-                        simpleParser(stream, (parseErr, parsed) => {
-                            if (parseErr) throw parseErr;
-                            console.log(`${prefix}Subject: ${parsed.subject}`);
-                            console.log(`${prefix}From: ${parsed.from.text}`);
-                            console.log(`${prefix}To: ${parsed.to.text}`);
-                            if (parsed.text) {
-                                //console.log(`${prefix}Text body: ${parsed.text}`);
-                            }
-                            if (parsed.html) {
-                                //console.log(`${prefix}HTML body: ${parsed.html}`);
-                            }
-                        });
-                    });
-                    msg.once('attributes', function(attrs) {
-                        console.log(prefix + 'Attributes: %d', attrs.uid);
-                    });
-                });*/
-                    //console.log(f['boides']);
                 f.once('message', (message,seno) => {
                     let email = {
                         uid: 0,
@@ -136,7 +118,6 @@ async function fetchNewEmails(imap, eve) {
                                 stream.once('end', () => {
                                     simpleParser(buffer, (err2, mail) => {
                                         if (err2) {
-                                            console.log('Read mail executor error .....', err2);
                                             reject(err2);
                                             return;
                                         }
@@ -206,14 +187,12 @@ async function fetchNewEmails(imap, eve) {
                 });
             }
         }
-        console.log('저장 끝');
         imap.end();
         imap.once('end', function() {
             getSavedEmails(imap._config.user, (err, rows) => {
                 if (err) {
                     console.error('이메일 가져오기 오류:', err);
                 } else {
-                    console.log("가져오기 완료");
                     const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
                     eve.sender.send('getMailListReply', mail);
                 }

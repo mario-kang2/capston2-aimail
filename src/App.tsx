@@ -1,8 +1,9 @@
-import { AppBar, Box, Container, Divider, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Snackbar, Stack, Toolbar, Tooltip, Typography } from '@mui/material';
+import { AppBar, Box, Button, Container, Divider, Drawer, IconButton, InputBase, List, ListItem, ListItemButton, ListItemIcon, ListItemText, MenuItem, Select, Snackbar, Stack, ToggleButton, Toolbar, Tooltip, Typography, alpha, styled } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import React, { useEffect } from 'react';
+import SearchIcon from '@mui/icons-material/Search';
+import React, { useCallback, useEffect } from 'react';
 
-import { Add, Delete, Mail, ManageAccounts, Send } from '@mui/icons-material';
+import { CalendarMonth, Delete, Mail, ManageAccounts, People, Send, SwapVert } from '@mui/icons-material';
 import CloseIcon from '@mui/icons-material/Close'
 import { createRoot } from 'react-dom/client';
 
@@ -10,8 +11,55 @@ import AddAccountDialog from './AddAccountDialog'
 import AccountManageDialog from './AccountManageDialog';
 import AddSendAccountDialog from './AddSendAccountDialog';
 import SendMailDialog from './SendMailDialog';
+import CalendarDialog from './CalendarDialog';
+import ContactsDialog from './ContactsDialog';
 
 const drawerWidth = 240;
+
+// 검색 바
+// 값 변경 시 focus 잃는 이슈로 function 바깥에 선언
+const Search = styled('div')(({ theme }) => ({
+  position: 'relative',
+  borderRadius: theme.shape.borderRadius,
+  backgroundColor: alpha(theme.palette.common.white, 0.15),
+  '&:hover': {
+    backgroundColor: alpha(theme.palette.common.white, 0.25),
+  },
+  marginLeft: 0,
+  width: '100%',
+  [theme.breakpoints.up('sm')]: {
+    marginLeft: theme.spacing(1),
+    width: 'auto',
+  },
+}));
+
+const SearchIconWrapper = styled('div')(({ theme }) => ({
+  padding: theme.spacing(0, 2),
+  height: '100%',
+  position: 'absolute',
+  pointerEvents: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}));
+
+const StyledInputBase = styled(InputBase)(({ theme }) => ({
+  color: 'inherit',
+  width: '100%',
+  '& .MuiInputBase-input': {
+    padding: theme.spacing(1, 1, 1, 0),
+    // vertical padding + font size from searchIcon
+    paddingLeft: `calc(1em + ${theme.spacing(4)})`,
+    transition: theme.transitions.create('width'),
+    width: '100%',
+    [theme.breakpoints.up('sm')]: {
+      width: '12ch',
+      '&:focus': {
+        width: '20ch',
+      },
+    },
+  },
+}));
 
 function App() {
 
@@ -20,6 +68,8 @@ function App() {
   const [openAccountManage, setOpenAccountManage] = React.useState(false);
   const [openDrawer, setOpenDrawer] = React.useState(false);
   const [openSendMail, setOpenSendMail] = React.useState(false);
+  const [openCalendar, setOpenCalendar] = React.useState(false);
+  const [openContacts, setOpenContacts] = React.useState(false);
   const [accountData, setAccountData] = React.useState([]);
   const [sendAccountData, setSendAccountData] = React.useState([]);
   const [mailHeaderList, setMailHeaderList] = React.useState([]);
@@ -38,6 +88,8 @@ function App() {
   const [mailDeletedSnackbarOpen, setMailDeletedSnackbarOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [searchBy, setSearchBy] = React.useState('subject');
+
+  const [mailReverse, setMailReverse] = React.useState(false);
 
   // 앱 실행 시 동작
   // 메일 계정 데이터 확인 후 없으면 계정 등록 Dialog 호출
@@ -59,7 +111,6 @@ function App() {
       ipcRenderer.send("getMailList", res[0]);
       ipcRenderer.once('getMailListReply', (eve:any, res:any) => {
         var a: any = []
-        console.log(res);
         res.forEach((element: any) => {
           let headerJson = element;
           a.push(headerJson);
@@ -186,16 +237,22 @@ function App() {
       let date = new Date(isoTimeString);
       let formattedDate = date.toLocaleString();
       SetMailBodyTimes(formattedDate)
-    }
-    
+    } 
   }
+
+  // 메일 목록 업/다운 토글
+  const handleToggleMailList = () => {
+    setMailReverse(!mailReverse);
+    var a = mailHeaderList;
+    a.reverse();
+    setMailHeaderList(a);
+  };
 
   // 메일 가져오기 버튼 선택 시 동작
   const handleGetMessageButton = () => {
     let index = selectedIndex;
     ipcRenderer.send("getMailList", accountData[index]);
     ipcRenderer.once('getMailListReply', (eve:any, res:any) => {
-      console.log("show start");
       var a: any = []
       res.forEach((element: any) => {
         let headerJson = element;
@@ -283,7 +340,6 @@ function App() {
     if (mailIndex === -1) {
       return;
     }
-    console.log(mailHeaderList[mailIndex]);
     ipcRenderer.send("deleteMail", {"auth":accountData[accountIndex], "index":mailHeaderList[mailIndex]["uid"]});
     ipcRenderer.once('deleteMailReply', (eve:any, res:any) => {
       if (res) {
@@ -319,6 +375,13 @@ function App() {
     <div style={{textOverflow:"ellipse", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", wordBreak: "break-all"}}>
       <Toolbar/>
       <Divider/>
+      <Tooltip title="Toggle upward/downward">
+        <IconButton
+          aria-label="toggle upward/downward"
+          onClick={handleToggleMailList}>
+          <SwapVert/>
+        </IconButton>
+      </Tooltip>
       <List>
         {mailHeaderList.map((data: any, index: number) => (
           <ListItem onClick={() => handleMailBody(index)}>
@@ -330,31 +393,67 @@ function App() {
       </List>
     </div>
   )
-  const handleQueryChange = (event:any) => {
-    setQuery(event.target.value);
-  };
 
-  const handleSearchByChange = (event:any) => {
+  // 검색 필터
+  const SearchFilter = styled(Select)(({ theme }) => ({
+    position: 'relative',
+    borderRadius: theme.shape.borderRadius,
+    backgroundColor: alpha(theme.palette.common.white, 0.15),
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.common.white, 0.25),
+    },
+    marginLeft: 0,
+    width: '100%',
+    [theme.breakpoints.up('sm')]: {
+      marginLeft: theme.spacing(1),
+      width: 'auto',
+    },
+  }));
+
+  // 검색 시 동작
+  const handleQueryChange = useCallback((e:any) => {
+    setQuery(e.target.value);
+  }, [query]);
+
+  const handleSearchByChange = useCallback((event:any) => {
     setSearchBy(event.target.value);
-  };
-  const handleSearch = () => {
-    console.log(query);
-    ipcRenderer.send("searchMail",searchBy,query);
-    ipcRenderer.once('searchMailReply', (eve:any, res:any) => {
-      console.log("show start");
+  }, [searchBy]);
+
+  useEffect(() => {
+    const getResponse = async() => {
+      ipcRenderer.send("searchMail",searchBy,query);
+      ipcRenderer.once('searchMailReply', (eve:any, res:any) => {
       var a: any = []
-      console.log(res);
       res.forEach((element: any) => {
-        console.log(element);
         let headerJson = element;
-        console.log(headerJson);
         a.push(headerJson);
       });
       a.reverse();
       setMailHeaderList(a);
       ipcRenderer.removeAllListeners('getMailListReply');
-      setMailLoadedSnackbarOpen(true);
     })
+    }
+    getResponse();
+  }, [query, searchBy]);
+
+  // 캘린더 버튼 선택 시 동작
+  const handleCalendarButton = () => {
+    setOpenCalendar(true);
+  }
+
+  // 캘린더 닫기 동작
+  const handleCloseCalendar = () => {
+    setOpenCalendar(false);
+  }
+
+  // 연락처 버튼 선택 시 동작
+  const handleContactsButton = () => {
+    setOpenContacts(true);
+  }
+
+  // 연락처 닫기 동작
+  const handleCloseContacts = () => {
+    setOpenContacts(false);
   }
 
   // 계정 정보 Drawer
@@ -397,20 +496,20 @@ function App() {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{flexGrow: 1}}>Aimail</Typography>
-          <div>
-            <select value={searchBy} onChange={handleSearchByChange}>
-              <option value="subject">제목</option>
-              <option value="sender">발신인</option>
-            </select>
-          </div>
-          <div>
-            <input
-                type="text"
-                value={query}
-                onChange={handleQueryChange}
-            />
-            <button onClick={handleSearch}>검색</button>
-          </div>
+          <Tooltip title="Contacts">
+            <IconButton
+              color="inherit"
+              aria-label="contacts" onClick={handleContactsButton}>
+              <People/>
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Calendar">
+            <IconButton
+              color="inherit"
+              aria-label="calendar" onClick={handleCalendarButton}>
+              <CalendarMonth/>
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Get New Message">
             <IconButton
               color="inherit"
@@ -418,7 +517,7 @@ function App() {
               <Mail/>
             </IconButton>
           </Tooltip>
-          <Tooltip title="Get New Message">
+          <Tooltip title="Send Message">
             <IconButton
               color="inherit"
               aria-label="send message" onClick={handleSendMailButton}>
@@ -432,6 +531,26 @@ function App() {
               <Delete/>
             </IconButton>
           </Tooltip>
+          <SearchFilter
+            size="small"
+            value={searchBy}
+            sx={{boxShadow: "none", color: "white", '.MuiOutlinedInput-notchedOutline': {border: 0}}}
+            onChange={handleSearchByChange}
+            style={{position:"relative"}}>
+            <MenuItem value="subject">Subject</MenuItem>
+            <MenuItem value="sender">From</MenuItem>
+          </SearchFilter>
+          <Search>
+            <SearchIconWrapper>
+              <SearchIcon/>
+            </SearchIconWrapper>
+            <StyledInputBase
+              placeholder="Search…"
+              value={query}
+              onChange={handleQueryChange}
+              inputProps={{'aria-label':'search'}}
+            />
+          </Search>
         </Toolbar>
       </AppBar>
       <Drawer
@@ -457,6 +576,10 @@ function App() {
         </Box>
         <Divider/>
         <Box sx={{p:2}}>
+          <Typography>메일 요약본이 들어갈 위치</Typography>
+        </Box>
+        <Divider/>
+        <Box sx={{p:2}}>
         <div id="mailBody"></div>
         </Box>
       </Box>
@@ -466,6 +589,8 @@ function App() {
     <AddSendAccountDialog open={openAddSendAccount} onClose={handleCloseAddSendAccount}/>
     <AccountManageDialog open={openAccountManage} onClose={handleCloseAccountManage}/>
     <SendMailDialog open={openSendMail} onClose={handleCloseSendMail}/>
+    <CalendarDialog open={openCalendar} onClose={handleCloseCalendar}/>
+    <ContactsDialog open={openContacts} onClose={handleCloseContacts}/>
     <Box
       component="nav"
       sx={{ width: {sm: drawerWidth}, flexShrink: {sm: 0}}}
