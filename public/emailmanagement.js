@@ -7,11 +7,11 @@ var inspect = require('util').inspect
 function setupDatabase(){
     db.serialize(function() {
         db.run("CREATE TABLE IF NOT EXISTS users (usersid INTEGER primary key)");
-        db.run("CREATE TABLE IF NOT EXISTS email_address (address_id INTEGER primary key , user_id INTEGER, protocol TEXT, host TEXT,address text,password text)");
+        db.run("CREATE TABLE IF NOT EXISTS mail_account ([id] integer primary key autoincrement, [description] text, [mailHost] text, [mailPort] int, [mailSecurity] text, [mailUsername] text, [mailEmail] text, [mailPassword] text)");
         db.run("CREATE TABLE IF NOT EXISTS emails (email_id INTEGER primary key, address_id TEXT , subject TEXT, sender TEXT,label integer,recipient text,body text,times timestamp,attachment boolaen)");
         db.run("CREATE TABLE IF NOT EXISTS summary(summary_id INTEGER primary key , email_id INTEGER references emails(email_id),summary_text text, is_about_schedule boolaen)");
         db.run("CREATE TABLE IF NOT EXISTS schedule (schedule_id INTEGER primary key , summary_id INTEGER references summary(summary_id), start_time timestamp, end_time timestamp)");
-        db.run("CREATE TABLE IF NOT EXISTS attachment(attachment_id INTEGER primary key , email_id INTEGER references emails(email_id),type text, file_path file)");
+        db.run("CREATE TABLE IF NOT EXISTS attachment(attachment_id INTEGER primary key autoincrement , email_id INTEGER references emails(email_id),filename text, content blob)");
         db.run("CREATE TABLE IF NOT EXISTS contact(contact_id INTEGER primary key , email_id INTEGER references email_address(address_id),name text, address text)");
     });
 }
@@ -123,7 +123,8 @@ async function fetchNewEmails(imap, eve) {
                         recipient: '',
                         body: '',
                         times: new Date().toISOString(),
-                        attachments: false
+                        attachments: false,
+                        attachment:[]
                     };
                     Promise.all([
                         new Promise((resolve, reject) => {
@@ -142,15 +143,25 @@ async function fetchNewEmails(imap, eve) {
                                         email.times = mail.date.toISOString();
                                         email.subject = mail.subject || '';
                                         email.sender = mail.from.text || '';
-                                        console.log(typeof (mail.to.text || ''));
-                                        email.recipient = (mail.to.text || '').toString();
-
+                                        if(mail.to) {
+                                            email.recipient = (mail.to.text || '').toString();
+                                        }
                                         email.attachments = mail.attachments.length > 0;
+                                        if(email.attachments){
+                                            console.log("길이:",mail.attachments.length)
+                                            console.log(mail.attachments[0].content);
+                                        }
+                                        mail.attachments.forEach((attachment)=>{
+                                            email.attachment.push({filename:attachment.filename,content:attachment.content})
+                                            console.log(email.attachment);
+                                        });
+
+
                                         // Mail Text 구분을 위해 Prefix 삽입
                                         if (mail.text) {
                                             email.body = mail.text || '';
                                             email.body = 'PLAIN\r\n\r\n' + email.body;
-                                            
+
                                         }
                                         if (mail.html) {
                                             email.body = mail.html || '';
@@ -171,12 +182,24 @@ async function fetchNewEmails(imap, eve) {
                         // body와 attributes 이벤트 핸들러가 모두 완료되면 이메일을 데이터베이스에 저장
                        db.run(`INSERT INTO emails (email_id, address_id, subject, sender, recipient, label, body, times, attachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                             [email.uid, imap._config.user, email.subject, email.sender, email.recipient, 0, email.body, email.times, email.attachments], (insertErr) => {
-                                if (insertErr) {
-                                    console.error('이메일 저장 오류:', insertErr);
-                                } else {
-                                    console.log('이메일 저장 완료:', email.subject);
-                                }
-                            });
+                               if (insertErr) {
+                                   //console.error('이메일 저장 오류:',insertErr);
+                               } else {
+                                   //console.log('이메일 저장 완료:',email.subject);
+                                   if (email.attachments) {
+                                       email.attachment.forEach((attachment) => {
+                                           db.run('INSERT INTO attachment(email_id,filename,content) VALUES (?,?,?)',
+                                               [email.uid, attachment.filename, attachment.content], (insertErr) => {
+                                                   if (insertErr) {
+                                                       console.error('첨부파일 저장 오류:', insertErr);
+                                                   } else {
+                                                       console.log('이메일 저장 완료:', attachment.filename);
+                                                   }
+                                               });
+                                       });
+                                   }
+                               }
+                           });
                     }).catch((error) => {
                         console.error('이메일 처리 오류:', error);
                     });
