@@ -135,13 +135,7 @@ ipcMain.on('addSendAccount', (eve, args) => {
         eve.sender.send('addSendAccountReply', err);
     });
 });
-//연락처 정보 추가
-ipcMain.on('addContacts', (eve, args) => {
-    console.log("hi")
-    db.run('INSERT INTO contact (name, address,phoneNumber) VALUES (?, ?, ?)', [args.name, args.address, args.phoneNumber], err => {
-        eve.sender.send('addContactsReply', err);
-    });
-});
+
 //요약
 ipcMain.on('summarizeMail', (eve, args) => {
     const body=args.body;
