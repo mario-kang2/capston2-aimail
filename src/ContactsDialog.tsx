@@ -1,80 +1,93 @@
-import { Add, Remove, Send } from "@mui/icons-material";
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Stack } from "@mui/material";
+import { Add, Remove } from "@mui/icons-material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from "@mui/material";
 import { useEffect, useState } from "react";
-import AddContactsDialog from "./AddContactsDialog";
+import AddContactDialog from "./AddContactDialog";
+import RemoveContactDialog from "./RemoveContactDialog";
 
 export interface ContactsDialogProps {
     open: boolean;
     onClose: () => void;
 }
 
-
-export default function ContactsDialog(props: ContactsDialogProps) {
+export default function AddAccountDialog(props: ContactsDialogProps) {
     const {open, onClose} = props;
-    const [removeOpen, setRemoveOpen] = useState(false);
+    const [contact, setContact] = useState([]);
+    const [openAddContact, setOpenAddContact] = useState(false);
+    const [openRemoveContact, setOpenRemoveContact] = useState(false);
+
+    const [name, setName] = useState("");
+    const [address, setAddress] = useState("");
 
     const {ipcRenderer} = window.require("electron");
-    const [ContactsData, setContactsData] = useState([]);
-    const [openAddContacts, setOpenAddContacts] = useState(false);
-    const [openManageSendContacts, setOpenManageSendContacts] = useState(false);
-    const [ContactsName, setContactsName] = useState("");
 
     useEffect(() => {
         const {ipcRenderer} = window.require("electron");
-        ipcRenderer.send("lookupContactsDatabase");
-        ipcRenderer.once('lookupContactsDatabaseReply', (eve:any, res:any) => {
-            setContactsData(res);
+        ipcRenderer.send("lookupContactDatabase");
+        ipcRenderer.once('lookupContactDatabaseReply', (eve:any, res:any) => {
+            console.log(res);
+            setContact(res);
         });
     }, []);
+
     const handleClose = () => {
         onClose();
     }
-    const handleOpenRemoveContacts = (index:number, ContactsName:string) => {
-        setContactsName(ContactsName)
-        setRemoveOpen(true)
-    }
-    const handleCloseAddContacts = () => {
-        setOpenAddContacts(false);
-        ipcRenderer.send("lookupContactsDatabase");
-        ipcRenderer.once('lookupContactsDatabaseReply', (eve:any, res:any) => {
-            setContactsData(res);
+
+    const handleCloseAddContact = () => {
+        setOpenAddContact(false);
+        ipcRenderer.send("lookupContactDatabase");
+        ipcRenderer.once('lookupContactDatabaseReply', (eve:any, res:any) => {
+            setContact(res);
         });
-    };
+    }
+
+    const handleOpenRemoveContact = (index: number, contactAddress: string, contactName: string) => {
+        setName(contactName);
+        setAddress(contactAddress);
+        setOpenRemoveContact(true);
+    }
+
+    const handleCloseRemoveContact = () => {
+        setOpenRemoveContact(false);
+        ipcRenderer.send("lookupContactDatabase");
+        ipcRenderer.once('lookupContactDatabaseReply', (eve:any, res:any) => {
+            setContact(res);
+        });
+    }
 
     return (
         <>
-        <Dialog open={open} onClose={onClose}>
-            <DialogTitle>Contacts</DialogTitle>
-            <DialogContent>
-                <List>
-                    {ContactsData.map((Contacts: any, index) => (
-                        <Stack direction="row">
-                            <ListItem key={Contacts.contact_id}>
-                                <ListItemButton onClick={() => { handleOpenRemoveContacts(index, Contacts.name)}}>
+            <Dialog open={open} onClose={onClose}>
+                <DialogTitle>Contacts</DialogTitle>
+                <DialogContent>
+                    <List>
+                        {contact.map((value:any, index:number) => (
+                            <ListItem key={value.contact_id}>
+                                <ListItemButton onClick={() => handleOpenRemoveContact(index, value.address, value.name)}>
                                     <ListItemIcon>
                                         <Remove/>
                                     </ListItemIcon>
-                                    <ListItemText primary={Contacts.name} secondary={Contacts.address}/>
+                                    <ListItemText primary={value.name} secondary={value.address}/>
                                 </ListItemButton>
                             </ListItem>
-                        </Stack>
-                    ))}
-                </List>
-                <Divider/>
-                <ListItem>
-                    <ListItemButton onClick={() => setOpenAddContacts(true)}>
-                        <ListItemIcon>
-                            <Add/>
-                        </ListItemIcon>
-                        <ListItemText primary="Add Contacts"/>
-                    </ListItemButton>
-                </ListItem>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={handleClose}>Close</Button>
-            </DialogActions>
-        </Dialog>
-    <AddContactsDialog open={openAddContacts} onClose={handleCloseAddContacts}/>
-    </>
+                        ))}
+                    </List>
+                    <Divider/>
+                    <ListItem>
+                        <ListItemButton onClick={() => setOpenAddContact(true)}>
+                            <ListItemIcon>
+                                <Add/>
+                            </ListItemIcon>
+                            <ListItemText primary="Add Account"/>
+                        </ListItemButton>
+                    </ListItem>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleClose}>Close</Button>
+                </DialogActions>
+            </Dialog>
+            <AddContactDialog open={openAddContact} onClose={handleCloseAddContact}/>
+            <RemoveContactDialog open={openRemoveContact} onClose={handleCloseRemoveContact} contactAddress={address} contactName={name}/>
+        </>
     )
 }

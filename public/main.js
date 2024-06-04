@@ -278,3 +278,21 @@ ipcMain.on('searchMail', (eve, searchBy,query) => {
         }
     });
 })
+// 연락처 데이터 조회
+ipcMain.on('lookupContactDatabase', (eve) => {
+    db.all('SELECT * FROM contact', (err, rows) => {
+        eve.sender.send('lookupContactDatabaseReply', rows);
+    });
+})
+
+// 연락처 데이터 추가
+ipcMain.on('addContact', (eve, args) => {
+    db.run('INSERT INTO contact (Name, Address) VALUES (?, ?)', [args.name, args.address], err => {
+    });
+})
+
+// 연락처 데이터 삭제
+ipcMain.on('removeContact', (eve, args) => {
+    db.run('DELETE FROM contact WHERE Address = ?', [args.address], err => {
+    })
+})
