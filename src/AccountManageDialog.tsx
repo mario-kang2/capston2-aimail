@@ -69,7 +69,7 @@ export default function AccountManageDialog(props: AccountManageDialogProps) {
                     {accountData.map((account: any, index) => (
                         <Stack direction="row">
                             <ListItem key={account.id}>
-                                <ListItemButton onClick={() => handleOpenRemoveAccount(index, account.description)}>
+                                <ListItemButton onClick={() => { handleOpenRemoveAccount(index, account.description)}}>
                                     <ListItemIcon>
                                         <Remove/>
                                     </ListItemIcon>

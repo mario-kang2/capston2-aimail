@@ -14,6 +14,7 @@ import SendMailDialog from './SendMailDialog';
 import CalendarDialog from './CalendarDialog';
 import ContactsDialog from './ContactsDialog';
 
+
 const drawerWidth = 240;
 
 // 검색 바
@@ -77,6 +78,7 @@ function App() {
   const [mailBodyFrom, SetMailBodyFrom] = React.useState("");
   const [mailBodyTitle, SetMailBodyTitle] = React.useState("");
   const [mailBodyTimes, SetMailBodyTimes] = React.useState("");
+  const [mailBodySummary,SetMailBodySummary]=React.useState("");
 
   const [selectedIndex, SetSelectedIndex] = React.useState(0);
   const [selectedMailIndex, SetSelectedMailIndex] = React.useState(-1);
@@ -455,6 +457,21 @@ function App() {
   const handleCloseContacts = () => {
     setOpenContacts(false);
   }
+  //요약
+  const summarizeMail=async() =>{
+    const args= {
+      body: mailHeaderList[selectedMailIndex]["body"],
+      email_id: mailHeaderList[selectedMailIndex]["email_id"],
+      mailEmail: accountData[selectedIndex]["mailEmail"]
+    }
+
+    ipcRenderer.send('summarizeMail',args);
+    ipcRenderer.once('summarizeMailReply', (eve:any, res:any) => {
+      console.log(res)
+      SetMailBodySummary(res);
+      ipcRenderer.removeAllListeners('getMailListReply');
+    })
+  }
 
   // 계정 정보 Drawer
   const drawer = (
@@ -576,7 +593,11 @@ function App() {
         </Box>
         <Divider/>
         <Box sx={{p:2}}>
-          <Typography>메일 요약본이 들어갈 위치</Typography>
+          <ListItemButton onClick={summarizeMail}>
+            <ListItemText primary="summarize"/>
+          </ListItemButton>
+            <Typography>{mailBodySummary}</Typography>
+
         </Box>
         <Divider/>
         <Box sx={{p:2}}>

@@ -69,6 +69,11 @@ ipcMain.on('lookupSendAddressDatabase', (eve) => {
         eve.sender.send('lookupSendAccountDatabaseReply', rows);
     })
 })
+ipcMain.on('lookupContactsDatabase', (eve) => {
+    db.all('SELECT * FROM contact', (err, rows) => {
+        eve.sender.send('lookupContactsDatabaseReply', rows);
+    });
+})
 
 // IMAP 유효성 검사
 ipcMain.on('validateImap', (eve, args) => {
@@ -130,7 +135,19 @@ ipcMain.on('addSendAccount', (eve, args) => {
         eve.sender.send('addSendAccountReply', err);
     });
 });
-
+//연락처 정보 추가
+ipcMain.on('addContacts', (eve, args) => {
+    console.log("hi")
+    db.run('INSERT INTO contact (name, address,phoneNumber) VALUES (?, ?, ?)', [args.name, args.address, args.phoneNumber], err => {
+        eve.sender.send('addContactsReply', err);
+    });
+});
+//요약
+ipcMain.on('summarizeMail', (eve, args) => {
+    const body=args.body;
+    const email_id=args.email_id;
+    management.summarizebyopenai(body,email_id,eve);
+});
 // 메일 목록 조회 (IMAP)
 ipcMain.on('getMailList', (eve, args) => {
     const Imap = require('node-imap');

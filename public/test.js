@@ -1,32 +1,134 @@
 const cheerio = require('cheerio');
-
+const sqlite3 = require("sqlite3");
+const { htmlToText } = require('html-to-text');
 const OpenAI = require("openai");
 var inspect = require('util').inspect;
+const db = new sqlite3.Database("./mail.db");
+const { ImageAnnotatorClient } = require('@google-cloud/vision');
+const fetch = require('node-fetch');
+const client = new ImageAnnotatorClient({
+    keyFilename: './service-account-key.json',
+});
+const html='HTML\n' +
+    '\n' +
+    '<html lang="ko">\n' +
+    '<meta charset="utf-8">\n' +
+    '<!--[if (mso)|(mso 16)]>\n' +
+    '<table border="0" cellpadding="0" cellspacing="0" style="width:100%;padding:5px 0 15px;"><tr><td>\n' +
+    '<![endif]-->\n' +
+    '\t<div id="ds_box" style="font-family: \'맑은 고딕\',\'나눔 고딕\',dotum,Helvetica,sans-serif;line-height:1.5;font-size:12px;color:#666;*word-break:break-all;-ms-word-break:break-all;padding:15px 0;">\n' +
+    '        <div class="mail_preview_txt" style="display:none;height:0px;max-height:0;border-width:0px;border-color:initial;line-height:0px;"></div>\n' +
+    '        <img src=\'https://directsend.co.kr/index.php/mail_report_api/open/VTc0MTU5Nw/202405/47/yjy61224@naver.com/1499465\' width=\'0\' height=\'0\' style=\'float:left;\'>        <div style="width:100%;max-width:800px;margin:0 auto;"><!--style="margin:0 auto; margin:0 auto 0 0; margin: 0 0 0 auto" 로 정렬-->\n' +
+    '            <!--[if (mso)|(mso 16)]>\n' +
+    '            <table align="center" border="0" cellpadding="0" cellspacing="0" style="width:800px;"><tr><td>\n' +
+    '            <![endif]--><!-- align="left/center/right"로 정렬:아웃룩만-->\n' +
+    '            <table border="0" cellpadding="0" cellspacing="0" style="width:100%;min-height:100%;max-width:800px;border:0;-webkit-box-sizing:border-box;-moz-box-sizing:border-box;box-sizing:border-box; margin: 0 auto;" >\n' +
+    '                <tr>\n' +
+    '                    <td style="padding-bottom:20px;word-break:break-all;border-bottom:1px solid #e1e1e1;">\n' +
+    '                        <div style="text-align:center"><a href="https://directsend.co.kr/index.php/mail_report_api/click/VTc0MTU5Nw/202405/47/0/yjy61224@naver.com/17/1499465" target="_blank"><img alt="" height="1165" src="https://directsend.co.kr/index.php/mail_report_api/image_down/VTc0MTU5Nw/1229" width="540"></a></div>\n' +
+    '                    </td>\n' +
+    '                </tr>\n' +
+    '                <tr>\n' +
+    '                    <td align="center" style="padding:10px;"><!--푸터 가로폭이 최소, 최대로 맞춰져있기때문에 center로 정렬-->\n' +
+    '                                                        <!--[if (mso)|(mso 16)]>\n' +
+    '                                <style type="text/css">\n' +
+    '                                    .text_Box { line-height:80%; }\n' +
+    '                                </style>\n' +
+    '                                <![endif]-->\n' +
+    '                                <table border="0" cellpadding="0" cellspacing="0" style="text-align:left;width:100%;margin:0 auto;-webkit-box-sizing:border-box;-moz-box-sizing:border-box;box-sizing:border-box;">\n' +
+    '                                    <tr>\n' +
+    '                                        <td style="font-size:12px;font-family:\'맑은 고딕\', Helvetica, sans-serif;color: #999; padding-bottom:10px; padding-top:10px;" class="text_Box">\n' +
+    '                                            본 메일은 2024-05-31 19:00:00 기준, 회원님의 메일 수신동의 여부를 확인 후 발송되었습니다.<br />\n' +
+    '                                                                                            메일 수신을 원치 않으시면 <a target=\'_blank\' href=\'https://directsend.co.kr/index.php/mail_report_api/reject/VTc0MTU5Nw/202405/47/K/yjy61224@naver.com/1499465\'><b>[수신거부]</b></a>를 클릭하세요.                                                                                    </td>\n' +
+    '                                    </tr>\n' +
+    '                                    <tr>\n' +
+    '                                        <td style="font-size:12px;font-family:\'맑은 고딕\', Helvetica, sans-serif;color: #666;" class="text_Box">\n' +
+    '                                            SPOTV NOW | (주)커넥티비티  | 서울특별시 마포구 월드컵북로56길 12, 4층 (상암동, Trutec Building)<br />Email: <a href=\'mailto:spotv_now@spotv.net\'>spotv_now@spotv.net</a>                                        </td>\n' +
+    '                                    </tr>\n' +
+    '                                                                    </table>\n' +
+    '                                            </td>\n' +
+    '                </tr>\n' +
+    '            </table>\n' +
+    '            <!--[if (mso)|(mso 16)]>\n' +
+    '            </td></tr></table>\n' +
+    '            <![endif]-->\n' +
+    '        </div>\n' +
+    '    </div>\n' +
+    '\t\t<!-- end div first -->\n' +
+    '<!--[if (mso)|(mso 16)]>\n' +
+    '</td></tr></table>\n' +
+    '<![endif]-->\n' +
+    '</html>\n'
+const alltext=summarizebyopenai(html).then(alltext=>{
+    console.log('alltext: '+alltext +"\n length:"+alltext.length);
+})
+/*extractImageUrlFromHtml(html,'yjy61224@naver.com').then(alltext=>{
+    console.log('alltext: '+inspect(alltext) +"\n length:");
+    })
+    .catch(error => {
+        console.error('에러 발생:', error);
+    });*/
 
-const html='<table width="" cellpadding="0" cellspacing="10">                                                                                                                                                                                                              <tr>                                                                                                                                                                                                                                                           <td style="padding:10px; background-color:#fff; border:10px solid #eef9f9;">                                                                                                                                                                                   <table width="600" cellpadding="0" cellspacing="0" border="0"">                                                                                                                                                                                                <tr>                                                                                                                                                                                                                                                           <td colspan="2" style="padding:0px 0px 10px 0px;">                                                                                                                                                                                                             <img src="http://mail.ssu.ac.kr/images/sangdam/sangdam_logo.gif"></td>                                                                                                                                                                                         </tr>                                                                                                                                                                                                                                                          <tr>                                                                                                                                                                                                                                                           <td width="50" style="font:bold 12px \'Malgun Gothic\'; color:#000; background-color:#e5f6f9; border-top: 1px solid #00678f; padding:5px; text-align:center;">수신</td>                                                                                            <td width="550" style="font:12px \'Malgun Gothic\'; color:#000; border-top: 1px solid #00678f; padding:5px;">유진영 (yjy61224@naver.com)</td>                                                                                                                       </tr>                                                                                                                                                                                                                                                          <tr>                                                                                                                                                                                                                                                           <td width="50" style="font:bold 12px \'Malgun Gothic\'; color:#000; background-color:#e5f6f9; border-top: 1px solid #00678f; border-bottom: 2px solid #00678f; padding:5px; text-align:center;">제목</td>                                                          <td width="550" style="font:12px \'Malgun Gothic\'; color:#000; border-top: 1px solid #00678f; border-bottom: 2px solid #00678f; padding:5px;">진로지도 상담에서 유진영 학생에게 보낸 메세지 입니다.</td>                                                                               </tr>                                                                                                                                                                                                                                                          <tr>                                                                                                                                                                                                                                                           <td colspan="2" style="font:12px \'Malgun Gothic\'; color:#000; padding:10px; height:300px; vertical-align:top;">                                                                                                                                                <br>진로지도 상담을 담당하는 이상호 교수입니다.   <br>재학생은 매학기 진로지도 상담을 하여야 하는데,  <br>본 메일을 받은 학생은 이번 학기에 나에게 배정된 학생입니다.   <br><br>상담은 우선 전자메일로 진행하며, <br>본 메일에 상담내용을 회신하면 내가 답변을 하며, <br>상담내용이 없으면 &quot;상담내용없음&quot;으로                                                          회신하면 상담을 완료한 것으로 처리합니다.  <br><br>상담 내용을 따라 필요하다면 대면 또는 줌 상담도 가능합니다.    <br><br>--- 이상호 교수                                                                                                                                                                      </td>                                                                                                                                                                                                                                                          </tr>                                                                                                                                                                                                                                                          <tr>                                                                                                                                                                                                                                                           <td width="100%" colspan="2" style="font:11px \'Malgun Gothic\'; letter-spacing: 0px; line-height: 120%; color:#666; border-top: 2px solid #00678f; padding:10px 0px 0px 0px;">                                                                                  ※본 메일은 발신전용 메일이므로 회신이 되지 않습니다.                                                                                                                                                                                                                                 <BR><BR>                                                                                                                                                                                                                                                       06978 서울시 동작구 상도로 369 숭실대학교 Tel:02-820-0114 E-Mail:webmaster@ssu.ac.kr<br>Copyright (c) 2010 Soongsil University. All Rights Reserved.                                                                                                                         </td>                                                                                                                                                                                                                                                          </tr>                                                                                                                                                                                                                                                          </table>                                                                                                                                                                                                                                                       </td>                                                                                                                                                                                                                                                          </tr>                                                                                                                                                                                                                                                          </table>\n'
-const allText=emailBodyToText(html)
-console.log('alltext: '+allText +"\n length:"+allText.length);
+
 require('dotenv').config();
 //summarizebyopenai(allText);
-async function summarizebyopenai(text){
-    const openai = new OpenAI({apiKey:''});
-    const textToSummarize = text+'\n 요약해줘';
+async function htmlToCleanText(dirtytext) {
+    let text = htmlToText(dirtytext, {
+        wordwrap: 130,
+    });
+    text = text.replace(/\s+/g, ' ').replace(/(https?:\/\/[^ ]*)/gi, "").trim(); // Remove excessive whitespace
+    return text;
+}
+async function summarizebyopenai(rawtext,email_id){
+    text=await htmlToCleanText(rawtext);
+    const openai = new OpenAI({apiKey:'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'});
     const response = await openai.chat.completions.create({
         messages: [{"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": textToSummarize}],
+            {"role": "user", "content": "다음 정보를 바탕으로 이메일 내용을 정리해 주세요:\n1. 이메일 내용:\n"+text+"\n2. 범주 선택: 요청, 제안, 안내, 공지, 문의, 답변, 보고, 컨펌, 인사, 축하, 신청, 제출, 사과 중 하나\n형식은 다음과 같습니다:\n### 범주\n- {category}\n### 요약\n- 핵심 요약 1\n- 핵심 요약 2\n- 핵심 요약 3\n5 줄이 넘도록 요약하지는 않는다.\n### 일정 (있을 경우)\n- [년/월/일/시/분~년/월/일/시/분 형식]: [일정 내용]" +
+                    "일정은 범주에 해당하는 내용이다.\n일정은 요약에 표시되더라도 여기에 표시해야한다.\n일정이 없는 경우 ### 일정 (없음)표시\n일정이 있는 경우 ### 일정(있음)표시"}
+        ],
         model: "gpt-3.5-turbo",
+        temperature: 0.3
     });
 
-    console.log(response.choices[0]);
+    const summary = response.choices[0].message.content;
+    const regex = /### 일정 \(없음\)/;
+    if (regex.test(summary)) {
+    return summary;
+}
+async function extractImageUrlFromHtml(html,emailAddress) {
+    const $ = cheerio.load(html);
+    const imgTags = $('img'); // 모든 img 태그 선택
+
+    const imageUrls = [];
+    imgTags.each((index, element) => {
+        const imageUrl = $(element).attr('src'); // 각 img 태그의 src 속성 추출
+        if (imageUrl && !imageUrl.includes(emailAddress)) {
+            imageUrls.push(imageUrl);
+        }
+    });
+    console.log(imageUrls);
+    fulltext=''
+    try {
+        for (const url of imageUrls) {
+            const response = await fetch(url);
+            const buffer = await response.buffer();
+            const [result] = await client.textDetection(buffer);
+            const detections = result.textAnnotations;
+
+            fulltext += '\n' + detections[0].description;
+        }
+    }catch (error){
+        console.error('에러:', error);
+    }
+    return fulltext
 }
 function emailBodyToText(body){
     let allText=body;
     if (allText.startsWith("PLAIN\r\n\r\n")) { // Plain Text Mail
         allText = allText.replace("PLAIN\r\n\r\n", "");
-        let regex = /\n/gi;
-        allText = allText.replace(regex, " <br>")
-        let urlRegex = /(https?:\/\/[^ ]*)/gi;
-        allText = allText.replace(urlRegex, "<a href=\"$&\">$&</a>")
+        allText = allText.replace(/\n/gi, " <br>");
+        allText = allText.replace(/(https?:\/\/[^ ]*)/gi, "<a href=\"$&\">$&</a>");
     }
     else { // HTML Mail
         allText = allText.replace("HTML\r\n\r\n", "");
@@ -34,17 +136,18 @@ function emailBodyToText(body){
     const $ = cheerio.load(allText);
     const uniqueTexts = {};
     $('*').each((index, ele) => {
-        const text = $(ele).clone()          // 요소의 복사본을 만듭니다
-            .children()       // 자식 요소를 선택합니다
-            .remove()         // 자식 요소를 제거합니다
-            .end()            // 복사본을 반환합니다
-            .text()           // 텍스트를 추출합니다
-            .trim();          // 공백을 제거합니다
-        if (text) {
+        const text = $(ele).clone()
+            .children()
+            .remove()
+            .end()
+            .text()
+            .trim();
+        //console.log(text);
+        if (text.length>0) {
             uniqueTexts[text] = true;
         }
     });
 // 중복을 제거한 텍스트를 하나의 문자열로 합칩니다
-    const text = Object.keys(uniqueTexts).join('\n ');
+    const text = Object.keys(uniqueTexts).join(' ');
     return text;
 }
