@@ -9,6 +9,8 @@ export interface RemoveContactProps {
 
 export default function RemoveContactDialog(props: RemoveContactProps) {
     const {open, onClose, contactAddress, contactName} = props;
+    const {open, onClose, contactAddress, contactName} = props; 
+
     const {ipcRenderer} = window.require("electron");
 
     const handleClose = () => {

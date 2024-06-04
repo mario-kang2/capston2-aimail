@@ -88,6 +88,37 @@ export default function AddAccountDialog(props: ContactsDialogProps) {
             </Dialog>
             <AddContactDialog open={openAddContact} onClose={handleCloseAddContact}/>
             <RemoveContactDialog open={openRemoveContact} onClose={handleCloseRemoveContact} contactAddress={address} contactName={name}/>
+        <Dialog open={open} onClose={onClose}>
+            <DialogTitle>Contacts</DialogTitle>
+            <DialogContent>
+                <List>
+                    {contact.map((value:any, index:number) => (
+                        <ListItem key={value.contact_id}>
+                            <ListItemButton onClick={() => handleOpenRemoveContact(index, value.address, value.name)}>
+                                <ListItemIcon>
+                                    <Remove/>
+                                </ListItemIcon>
+                                <ListItemText primary={value.name} secondary={value.address}/>
+                            </ListItemButton>
+                        </ListItem>
+                    ))}
+                </List>
+                <Divider/>
+                <ListItem>
+                    <ListItemButton onClick={() => setOpenAddContact(true)}>
+                        <ListItemIcon>
+                            <Add/>
+                        </ListItemIcon>
+                        <ListItemText primary="Add Account"/>
+                    </ListItemButton>
+                </ListItem>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={handleClose}>Close</Button>
+            </DialogActions>
+        </Dialog>
+        <AddContactDialog open={openAddContact} onClose={handleCloseAddContact}/>
+        <RemoveContactDialog open={openRemoveContact} onClose={handleCloseRemoveContact} contactAddress={address} contactName={name}/>
         </>
     )
 }
