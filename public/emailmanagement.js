@@ -230,7 +230,7 @@ async function summarizebyopenai(rawtext,email_id,eve) {
         } else {
             console.log('값이 존재하지 않습니다.');
 
-            const openai = new OpenAI({apiKey: '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'});
+            const openai = new OpenAI({apiKey: ''});
             const response = await openai.chat.completions.create({
                 messages: [{"role": "system", "content": "You are a helpful assistant."},
                     {

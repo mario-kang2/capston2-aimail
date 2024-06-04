@@ -81,7 +81,7 @@ async function htmlToCleanText(dirtytext) {
 }
 async function summarizebyopenai(rawtext,email_id){
     text=await htmlToCleanText(rawtext);
-    const openai = new OpenAI({apiKey:'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'});
+    const openai = new OpenAI({apiKey:''});
     const response = await openai.chat.completions.create({
         messages: [{"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "다음 정보를 바탕으로 이메일 내용을 정리해 주세요:\n1. 이메일 내용:\n"+text+"\n2. 범주 선택: 요청, 제안, 안내, 공지, 문의, 답변, 보고, 컨펌, 인사, 축하, 신청, 제출, 사과 중 하나\n형식은 다음과 같습니다:\n### 범주\n- {category}\n### 요약\n- 핵심 요약 1\n- 핵심 요약 2\n- 핵심 요약 3\n5 줄이 넘도록 요약하지는 않는다.\n### 일정 (있을 경우)\n- [년/월/일/시/분~년/월/일/시/분 형식]: [일정 내용]" +
