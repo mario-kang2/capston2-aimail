@@ -200,6 +200,7 @@ function App() {
     SetMailBodyFrom("")
     SetMailBodyTitle("")
     SetMailBodyTimes("")
+    SetMailBodySummary("")
     SetSelectedMailIndex(-1)
     handleDrawerClose()
   }
@@ -233,7 +234,7 @@ function App() {
       }
       SetMailBodyFrom(from)
       SetMailBodyTitle(mailHeaderList[index]["subject"])
-
+      SetMailBodySummary("")
       // Times
       let isoTimeString = mailHeaderList[index]["times"];
       let date = new Date(isoTimeString);
@@ -364,6 +365,7 @@ function App() {
           SetMailBodyFrom("")
           SetMailBodyTitle("")
           SetMailBodyTimes("")
+          SetMailBodySummary("")
           SetSelectedMailIndex(-1)
           setMailDeletedSnackbarOpen(true);
         })
