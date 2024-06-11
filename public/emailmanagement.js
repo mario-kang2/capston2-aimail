@@ -6,6 +6,9 @@ var fs = require('fs'), fileStream;
 const { htmlToText } = require('html-to-text');
 const OpenAI = require("openai");
 var inspect = require('util').inspect;
+
+
+
 function setupDatabase(){
     db.serialize(function() {
         db.run("CREATE TABLE IF NOT EXISTS users (usersid INTEGER primary key)");
@@ -215,22 +218,21 @@ async function htmlToCleanText(dirtytext) {
     return text;
 }
 async function summarizebyopenai(rawtext,email_id,eve) {
+    const OPENAI_API_KEY = require('./apikey.json').OPENAI_API_KEY;
     text = await htmlToCleanText(rawtext[0]);
     console.log(inspect(text));
     console.log(email_id);
-    if(!email_id) throw error;
+    //if(!email_id) throw error;
     const query = 'SELECT * FROM summary WHERE email_id = ?';
     db.all(query, email_id[0], async (error, results, fields) => {
         if (error) throw error;
-
         // 결과 확인
         if (results.length > 0) {
             console.log(results[0].summary_text);
             eve.sender.send('summarizeMailReply', results[0].summary_text);
         } else {
             console.log('값이 존재하지 않습니다.');
-
-            const openai = new OpenAI({apiKey: ''});
+            const openai = new OpenAI({apiKey: OPENAI_API_KEY});
             const response = await openai.chat.completions.create({
                 messages: [{"role": "system", "content": "You are a helpful assistant."},
                     {

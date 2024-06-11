@@ -175,7 +175,7 @@ ipcMain.on('searchMaillist', (eve, args) => {
         if (err) {
             console.error('이메일 검색 오류:', err);
         } else {
-            const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
+            const mail=rows.map(({email_id,sender,subject,body,times})=>({email_id:[email_id],from:[sender],subject:[subject],body:[body],times:[times]}));
             eve.sender.send('searchMailListReply', mail);
         }
     })
@@ -267,7 +267,7 @@ ipcMain.on('searchMail', (eve, searchBy,query) => {
         if (err) {
             console.error('이메일 가져오기 오류:', err);
         } else {
-            const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
+            const mail=rows.map(({email_id,sender,subject,body,times})=>({email_id:[email_id],from:[sender],subject:[subject],body:[body],times:[times]}));
             eve.sender.send('searchMailReply', mail);
         }
     });
@@ -290,3 +290,15 @@ ipcMain.on('removeContact', (eve, args) => {
     db.run('DELETE FROM contact WHERE Address = ?', [args.address], err => {
     })
 })
+
+// 로컬 요약 데이터 조회
+ipcMain.on('lookupLocalSummary', (eve, args) => {
+    db.all('SELECT * FROM summary WHERE email_id = ?', args, async (err, rows) => {
+        if (rows.length > 0) {
+            eve.sender.send('lookupLocalSummaryReply', rows[0].summary_text);
+        }
+        else {
+            eve.sender.send('lookupLocalSummaryReply', "");
+        }
+    });
+});

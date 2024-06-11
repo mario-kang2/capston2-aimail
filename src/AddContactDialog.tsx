@@ -78,7 +78,6 @@ export default function AddContactDialog(props: AddContactDialogProps) {
                     helperText={addressError ? "Mail address is invalid" : ""}
                     onChange={(e:React.ChangeEvent<HTMLInputElement>) => handleAddressChange(e)}
                 />
-                    />
             </DialogContent>
             <DialogActions>
                 <Button onClick={handleClose}>Cancel</Button>

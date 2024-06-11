@@ -150,4 +150,4 @@ function emailBodyToText(body){
 // 중복을 제거한 텍스트를 하나의 문자열로 합칩니다
     const text = Object.keys(uniqueTexts).join(' ');
     return text;
-}
+}}
