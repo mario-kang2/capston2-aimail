@@ -24,7 +24,6 @@ export default function AddAccountDialog(props: ContactsDialogProps) {
         const {ipcRenderer} = window.require("electron");
         ipcRenderer.send("lookupContactDatabase");
         ipcRenderer.once('lookupContactDatabaseReply', (eve:any, res:any) => {
-            console.log(res);
             setContact(res);
         });
     }, []);

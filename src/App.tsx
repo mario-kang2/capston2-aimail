@@ -1,9 +1,9 @@
-import { AppBar, Box, Card, Chip, Container, Divider, Drawer, IconButton, InputBase, List, ListItem, ListItemButton, ListItemIcon, ListItemText, MenuItem, Select, Snackbar, Stack, Toolbar, Tooltip, Typography, alpha, styled } from '@mui/material';
+import { AppBar, Box, Card, Chip, Container, Dialog, Divider, Drawer, IconButton, InputBase, List, ListItem, ListItemButton, ListItemIcon, ListItemText, MenuItem, Select, Snackbar, Stack, Toolbar, Tooltip, Typography, alpha, styled } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import React, { useCallback, useEffect } from 'react';
 
-import { CalendarMonth, Delete, Mail, ManageAccounts, People, Send, Summarize, SwapVert } from '@mui/icons-material';
+import { CalendarMonth, Delete, Mail, ManageAccounts, People, Schedule, Send, Summarize, SwapVert } from '@mui/icons-material';
 import CloseIcon from '@mui/icons-material/Close'
 import { createRoot } from 'react-dom/client';
 
@@ -13,7 +13,7 @@ import AddSendAccountDialog from './AddSendAccountDialog';
 import SendMailDialog from './SendMailDialog';
 import CalendarDialog from './CalendarDialog';
 import ContactsDialog from './ContactsDialog';
-
+import ScheduleAcceptDialog from './ScheduleAcceptDialog';
 
 const drawerWidth = 240;
 
@@ -71,6 +71,7 @@ function App() {
   const [openSendMail, setOpenSendMail] = React.useState(false);
   const [openCalendar, setOpenCalendar] = React.useState(false);
   const [openContacts, setOpenContacts] = React.useState(false);
+  const [openScheduleAccept, setOpenScheduleAccept] = React.useState(false);
   const [accountData, setAccountData] = React.useState([]);
   const [sendAccountData, setSendAccountData] = React.useState([]);
   const [mailHeaderList, setMailHeaderList] = React.useState([]);
@@ -79,6 +80,13 @@ function App() {
   const [mailBodyTitle, SetMailBodyTitle] = React.useState("");
   const [mailBodyTimes, SetMailBodyTimes] = React.useState("");
   const [mailBodySummary,SetMailBodySummary] = React.useState<string | JSX.Element>("");
+
+  const [scheduleDateFrom, setScheduleDateFrom] = React.useState("");
+  const [scheduleDateTo, setScheduleDateTo] = React.useState("");
+  const [scheduleTimeFrom, setScheduleTimeFrom] = React.useState("");
+  const [scheduleTimeTo, setScheduleTimeTo] = React.useState("");
+  const [scheduleSummaryID, setScheduleSummaryID] = React.useState(-1);
+  const [scheduleSummaryTitle, setScheduleSummaryTitle] = React.useState("");
 
   const [selectedIndex, SetSelectedIndex] = React.useState(0);
   const [selectedMailIndex, SetSelectedMailIndex] = React.useState(-1);
@@ -102,7 +110,6 @@ function App() {
   // 메일 계정 데이터가 있으면 각 계정당 메일 목록 가져오기
   // 보내기 계정 데이터 확인
   useEffect(() => {
-    console.log("UseEffect");
     const {ipcRenderer} = window.require("electron");
     ipcRenderer.send("createAccountDatabase");
     ipcRenderer.send("lookupAccountDatabase");
@@ -254,7 +261,6 @@ function App() {
       else {
         let summarizeTextSplit = res.split("### ");
         let summarizeTextCategoryOriginal = summarizeTextSplit[1];
-        console.log(summarizeTextSplit)
         let summarizeTextCategory = summarizeTextCategoryOriginal.replace("범주\n- ", "")
         const renderCategoryChip = (
           <Chip label={summarizeTextCategory} />
@@ -379,7 +385,6 @@ function App() {
     if (mailIndex === -1) {
       return;
     }
-    console.log(mailHeaderList[mailIndex])
     ipcRenderer.send("deleteMail", {"auth":accountData[accountIndex], "index":mailHeaderList[mailIndex]["email_id"]});
     ipcRenderer.once('deleteMailReply', (eve:any, res:any) => {
       if (res) {
@@ -496,19 +501,22 @@ function App() {
     setOpenContacts(false);
   }
 
+  // 일정 수락 Dialog 닫기 동작
+  const handleCloseScheduleAccept = () => {
+    setOpenScheduleAccept(false);
+  }
+
   //요약
-  const summarizeMail=async() =>{
+  const summarizeMail = async() =>{
     const args= {
       body: mailHeaderList[selectedMailIndex]["body"],
       email_id: mailHeaderList[selectedMailIndex]["email_id"],
       mailEmail: accountData[selectedIndex]["mailEmail"]
     }
 
-    console.log(mailHeaderList[selectedMailIndex]);
 
     ipcRenderer.send('summarizeMail',args);
     ipcRenderer.once('summarizeMailReply', (eve:any, res:any) => {
-      console.log(res)
       if (res.length === 0) {
         setMailCategoryChip("");
         SetMailBodySummary("");
@@ -516,7 +524,6 @@ function App() {
       else {
         let summarizeTextSplit = res.split("### ");
         let summarizeTextCategoryOriginal = summarizeTextSplit[1];
-        console.log(summarizeTextSplit)
         let summarizeTextCategory = summarizeTextCategoryOriginal.replace("범주\n- ", "")
         const renderCategoryChip = (
           <Chip label={summarizeTextCategory} />
@@ -526,6 +533,47 @@ function App() {
         let summarizeTextContent = summarizeTextSplit[2];
         let summarizeTextContentSplit = summarizeTextContent.split("\n- ");
         summarizeTextContentSplit.splice(0, 1)
+
+        // 요약본 내 일정 처리
+        let summarizeTextSchedule = summarizeTextSplit[3];
+        let summarizeTextScheduleSplit = summarizeTextSchedule.split("\n- ");
+        let scheduleIsExist = summarizeTextScheduleSplit[0].includes("있음");
+        if (scheduleIsExist) {
+          // Summary ID 조회
+          ipcRenderer.send('lookupSummaryId',mailHeaderList[selectedMailIndex]["email_id"]);
+          ipcRenderer.once("lookupSummaryIdReply", (eve:any, res:any) => {
+            let summaryId = res;
+            if (res !== -1) {
+              // DB에 일정 저장되어 있는지 확인
+              ipcRenderer.send('lookupScheduleBySummaryId', summaryId);
+              ipcRenderer.once('lookupScheduleBySummaryIdReply', (eve:any, res:any) => {
+                if (res.length === 0) {
+                  // 일정 정제
+                  let scheduleText = summarizeTextScheduleSplit[1];
+                  let dayRegex = /([0-9]{1,4}[/.][0-9]{1,2}[/.][0-9]{1,2})/g;
+                  let timeRegex = /([0-9]{1,2}:[0-9]{1,2})/g;
+                  let dayMatch = scheduleText.match(dayRegex);
+                  let timeMatch = scheduleText.match(timeRegex);
+                  let dayFrom = dayMatch[0];
+                  let timeFrom = timeMatch[0];
+                  var dayTo = dayMatch.length >= 2 ? dayMatch[1] : dayFrom;
+                  var timeTo = dayMatch.length >= 2 ? timeMatch[1] : timeFrom;
+
+                  setScheduleDateFrom(dayFrom);
+                  setScheduleDateTo(dayTo);
+                  setScheduleTimeFrom(timeFrom);
+                  setScheduleTimeTo(timeTo);
+                  setScheduleSummaryID(summaryId);
+                  setScheduleSummaryTitle(mailHeaderList[selectedMailIndex]["subject"][0]);
+
+                  setOpenScheduleAccept(true);
+                }
+              });
+            }
+          });
+        }
+
+        // 최종 출력
         const renderText = (
           <Card sx={{mb:2}}>
             <Box sx={{p:2}}>
@@ -705,6 +753,7 @@ function App() {
     <SendMailDialog open={openSendMail} onClose={handleCloseSendMail}/>
     <CalendarDialog open={openCalendar} onClose={handleCloseCalendar}/>
     <ContactsDialog open={openContacts} onClose={handleCloseContacts}/>
+    <ScheduleAcceptDialog open={openScheduleAccept} onClose={handleCloseScheduleAccept} scheduleDateFrom={scheduleDateFrom} scheduleDateTo={scheduleDateTo} scheduleTimeFrom={scheduleTimeFrom} scheduleTimeTo={scheduleTimeTo} scheduleSummaryID={scheduleSummaryID} scheduleSummaryTitle={scheduleSummaryTitle}/>
     <Box
       component="nav"
       sx={{ width: {sm: drawerWidth}, flexShrink: {sm: 0}}}
