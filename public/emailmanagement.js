@@ -6,13 +6,16 @@ var fs = require('fs'), fileStream;
 const { htmlToText } = require('html-to-text');
 const OpenAI = require("openai");
 var inspect = require('util').inspect;
+
+
+
 function setupDatabase(){
     db.serialize(function() {
         db.run("CREATE TABLE IF NOT EXISTS users (usersid INTEGER primary key)");
         db.run("CREATE TABLE IF NOT EXISTS mail_account ([id] integer primary key autoincrement, [description] text, [mailHost] text, [mailPort] int, [mailSecurity] text, [mailUsername] text, [mailEmail] text, [mailPassword] text)");
         db.run("CREATE TABLE IF NOT EXISTS emails (email_id INTEGER primary key, address_id TEXT , subject TEXT, sender TEXT,label integer,recipient text,body text,times timestamp,attachment boolaen)");
         db.run("CREATE TABLE IF NOT EXISTS summary(summary_id INTEGER primary key autoincrement , email_id INTEGER references emails(email_id),summary_text text, is_about_schedule boolean)");
-        db.run("CREATE TABLE IF NOT EXISTS schedule (schedule_id INTEGER primary key , summary_id INTEGER references summary(summary_id), start_time timestamp, end_time timestamp)");
+        db.run("CREATE TABLE IF NOT EXISTS schedule (schedule_id INTEGER primary key , summary_id INTEGER references summary(summary_id), start_time timestamp, end_time timestamp, title text)");
         db.run("CREATE TABLE IF NOT EXISTS attachment(attachment_id INTEGER primary key autoincrement , email_id INTEGER references emails(email_id),filename text, content blob)");
         db.run("CREATE TABLE IF NOT EXISTS contact(contact_id INTEGER primary key autoincrement ,name text, address text,phoneNumber text)");
     });
@@ -134,12 +137,9 @@ async function fetchNewEmails(imap, eve) {
                                         }
                                         email.attachments = mail.attachments.length > 0;
                                         if(email.attachments){
-                                            console.log("길이:",mail.attachments.length)
-                                            console.log(mail.attachments[0].content);
                                         }
                                         mail.attachments.forEach((attachment)=>{
                                             email.attachment.push({filename:attachment.filename,content:attachment.content})
-                                            console.log(email.attachment);
                                         });
 
 
@@ -171,7 +171,6 @@ async function fetchNewEmails(imap, eve) {
                                if (insertErr) {
                                    //console.error('이메일 저장 오류:',insertErr);
                                } else {
-                                   //console.log('이메일 저장 완료:',email.subject);
                                    if (email.attachments) {
                                        email.attachment.forEach((attachment) => {
                                            db.run('INSERT INTO attachment(email_id,filename,content) VALUES (?,?,?)',
@@ -179,7 +178,6 @@ async function fetchNewEmails(imap, eve) {
                                                    if (insertErr) {
                                                        console.error('첨부파일 저장 오류:', insertErr);
                                                    } else {
-                                                       console.log('이메일 저장 완료:', attachment.filename);
                                                    }
                                                });
                                        });
@@ -215,22 +213,17 @@ async function htmlToCleanText(dirtytext) {
     return text;
 }
 async function summarizebyopenai(rawtext,email_id,eve) {
+    const OPENAI_API_KEY = require('./apikey.json').OPENAI_API_KEY;
     text = await htmlToCleanText(rawtext[0]);
-    console.log(inspect(text));
-    console.log(email_id);
-    if(!email_id) throw error;
+    //if(!email_id) throw error;
     const query = 'SELECT * FROM summary WHERE email_id = ?';
     db.all(query, email_id[0], async (error, results, fields) => {
         if (error) throw error;
-
         // 결과 확인
         if (results.length > 0) {
-            console.log(results[0].summary_text);
             eve.sender.send('summarizeMailReply', results[0].summary_text);
         } else {
-            console.log('값이 존재하지 않습니다.');
-
-            const openai = new OpenAI({apiKey: ''});
+            const openai = new OpenAI({apiKey: OPENAI_API_KEY});
             const response = await openai.chat.completions.create({
                 messages: [{"role": "system", "content": "You are a helpful assistant."},
                     {
@@ -256,10 +249,8 @@ async function summarizebyopenai(rawtext,email_id,eve) {
                     if (insertErr) {
                         console.error('요약 저장 오류:', insertErr);
                     } else {
-                        //console.log('이메일 요약 저장 완료:', attachment.filename);
                     }
                 });
-            console.log(summary);
             eve.sender.send('summarizeMailReply', summary);
         }
     });

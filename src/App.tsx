@@ -1,9 +1,9 @@
-import { AppBar, Box, Button, Container, Divider, Drawer, IconButton, InputBase, List, ListItem, ListItemButton, ListItemIcon, ListItemText, MenuItem, Select, Snackbar, Stack, ToggleButton, Toolbar, Tooltip, Typography, alpha, styled } from '@mui/material';
+import { AppBar, Box, Card, Chip, Container, Dialog, Divider, Drawer, IconButton, InputBase, List, ListItem, ListItemButton, ListItemIcon, ListItemText, MenuItem, Select, Snackbar, Stack, Toolbar, Tooltip, Typography, alpha, styled } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import React, { useCallback, useEffect } from 'react';
 
-import { CalendarMonth, Delete, Mail, ManageAccounts, People, Send, SwapVert } from '@mui/icons-material';
+import { CalendarMonth, Delete, Mail, ManageAccounts, People, Schedule, Send, Summarize, SwapVert } from '@mui/icons-material';
 import CloseIcon from '@mui/icons-material/Close'
 import { createRoot } from 'react-dom/client';
 
@@ -13,7 +13,7 @@ import AddSendAccountDialog from './AddSendAccountDialog';
 import SendMailDialog from './SendMailDialog';
 import CalendarDialog from './CalendarDialog';
 import ContactsDialog from './ContactsDialog';
-
+import ScheduleAcceptDialog from './ScheduleAcceptDialog';
 
 const drawerWidth = 240;
 
@@ -71,6 +71,7 @@ function App() {
   const [openSendMail, setOpenSendMail] = React.useState(false);
   const [openCalendar, setOpenCalendar] = React.useState(false);
   const [openContacts, setOpenContacts] = React.useState(false);
+  const [openScheduleAccept, setOpenScheduleAccept] = React.useState(false);
   const [accountData, setAccountData] = React.useState([]);
   const [sendAccountData, setSendAccountData] = React.useState([]);
   const [mailHeaderList, setMailHeaderList] = React.useState([]);
@@ -78,16 +79,27 @@ function App() {
   const [mailBodyFrom, SetMailBodyFrom] = React.useState("");
   const [mailBodyTitle, SetMailBodyTitle] = React.useState("");
   const [mailBodyTimes, SetMailBodyTimes] = React.useState("");
-  const [mailBodySummary,SetMailBodySummary]=React.useState("");
+  const [mailBodySummary,SetMailBodySummary] = React.useState<string | JSX.Element>("");
+
+  const [scheduleDateFrom, setScheduleDateFrom] = React.useState("");
+  const [scheduleDateTo, setScheduleDateTo] = React.useState("");
+  const [scheduleTimeFrom, setScheduleTimeFrom] = React.useState("");
+  const [scheduleTimeTo, setScheduleTimeTo] = React.useState("");
+  const [scheduleSummaryID, setScheduleSummaryID] = React.useState(-1);
+  const [scheduleSummaryTitle, setScheduleSummaryTitle] = React.useState("");
 
   const [selectedIndex, SetSelectedIndex] = React.useState(0);
   const [selectedMailIndex, SetSelectedMailIndex] = React.useState(-1);
 
   const {ipcRenderer} = window.require("electron");
 
+  const [mailCategoryChip, setMailCategoryChip] = React.useState<string|JSX.Element>("");
+
   const [mailLoadedSnackbarOpen, setMailLoadedSnackbarOpen] = React.useState(false);
   const [mailSentSnackbarOpen, setMailSentSnackbarOpen] = React.useState(false);
   const [mailDeletedSnackbarOpen, setMailDeletedSnackbarOpen] = React.useState(false);
+  const [mailSummarizedSnackbarOpen, SetMailSummarizedSnackbarOpen] = React.useState(false);
+
   const [query, setQuery] = React.useState('');
   const [searchBy, setSearchBy] = React.useState('subject');
 
@@ -101,7 +113,6 @@ function App() {
     const {ipcRenderer} = window.require("electron");
     ipcRenderer.send("createAccountDatabase");
     ipcRenderer.send("lookupAccountDatabase");
-    
     ipcRenderer.once('lookupAccountDatabaseReply', (eve:any, res:any) => {
     if (res.length === 0) {
       setOpenAddAccount(true);
@@ -111,7 +122,7 @@ function App() {
       setAccountData(res);
       SetSelectedIndex(0);
       ipcRenderer.send("getMailList", res[0]);
-      ipcRenderer.once('getMailListReply', (eve:any, res:any) => {
+      ipcRenderer.once("getMailListReply", (eve:any, res:any) => {
         var a: any = []
         res.forEach((element: any) => {
           let headerJson = element;
@@ -123,7 +134,6 @@ function App() {
         setMailLoadedSnackbarOpen(true);
       })
     }
-
     ipcRenderer.send("lookupSendAccountDatabase");
     ipcRenderer.once('lookupSendAccountDatabaseReply', (eve:any, res:any) => {
       setSendAccountData(res);
@@ -190,6 +200,7 @@ function App() {
       a.reverse();
       setMailHeaderList(a);
       ipcRenderer.removeAllListeners('getMailListReply');
+      setMailLoadedSnackbarOpen(true);
     })
     const bodyElement = document.getElementById('mailBody');
     if (bodyElement) {
@@ -239,7 +250,39 @@ function App() {
       let date = new Date(isoTimeString);
       let formattedDate = date.toLocaleString();
       SetMailBodyTimes(formattedDate)
-    } 
+    }
+    // 로컬 요약본 가져오기
+    ipcRenderer.send('lookupLocalSummary',mailHeaderList[index]["email_id"]);
+    ipcRenderer.once('lookupLocalSummaryReply', (eve:any, res:any) => {
+      if (res.length === 0) {
+        setMailCategoryChip("");
+        SetMailBodySummary("");
+      }
+      else {
+        let summarizeTextSplit = res.split("### ");
+        let summarizeTextCategoryOriginal = summarizeTextSplit[1];
+        let summarizeTextCategory = summarizeTextCategoryOriginal.replace("범주\n- ", "")
+        const renderCategoryChip = (
+          <Chip label={summarizeTextCategory} />
+        )
+        setMailCategoryChip(renderCategoryChip);
+
+        let summarizeTextContent = summarizeTextSplit[2];
+        let summarizeTextContentSplit = summarizeTextContent.split("\n- ");
+        summarizeTextContentSplit.splice(0, 1)
+        const renderText = (
+          <Card sx={{mb:2}}>
+            <Box sx={{p:2}}>
+              {summarizeTextContentSplit.map((content: string) => (
+                <Typography>{content}</Typography>
+              ))}
+            </Box>
+          </Card>
+        )
+        SetMailBodySummary(renderText);
+      }
+      ipcRenderer.removeAllListeners('lookupLocalSummaryReply');
+    })
   }
 
   // 메일 목록 업/다운 토글
@@ -331,7 +374,7 @@ function App() {
       setOpenAddSendAccount(true);
     }
     else {
-
+      setOpenSendMail(true);
     }
   }
 
@@ -342,7 +385,7 @@ function App() {
     if (mailIndex === -1) {
       return;
     }
-    ipcRenderer.send("deleteMail", {"auth":accountData[accountIndex], "index":mailHeaderList[mailIndex]["uid"]});
+    ipcRenderer.send("deleteMail", {"auth":accountData[accountIndex], "index":mailHeaderList[mailIndex]["email_id"]});
     ipcRenderer.once('deleteMailReply', (eve:any, res:any) => {
       if (res) {
         ipcRenderer.send("getMailList", accountData[accountIndex]);
@@ -457,21 +500,114 @@ function App() {
   const handleCloseContacts = () => {
     setOpenContacts(false);
   }
+
+  // 일정 수락 Dialog 닫기 동작
+  const handleCloseScheduleAccept = () => {
+    setOpenScheduleAccept(false);
+  }
+
   //요약
-  const summarizeMail=async() =>{
+  const summarizeMail = async() =>{
     const args= {
       body: mailHeaderList[selectedMailIndex]["body"],
       email_id: mailHeaderList[selectedMailIndex]["email_id"],
       mailEmail: accountData[selectedIndex]["mailEmail"]
     }
 
+
     ipcRenderer.send('summarizeMail',args);
     ipcRenderer.once('summarizeMailReply', (eve:any, res:any) => {
-      console.log(res)
-      SetMailBodySummary(res);
+      if (res.length === 0) {
+        setMailCategoryChip("");
+        SetMailBodySummary("");
+      }
+      else {
+        let summarizeTextSplit = res.split("### ");
+        let summarizeTextCategoryOriginal = summarizeTextSplit[1];
+        let summarizeTextCategory = summarizeTextCategoryOriginal.replace("범주\n- ", "")
+        const renderCategoryChip = (
+          <Chip label={summarizeTextCategory} />
+        )
+        setMailCategoryChip(renderCategoryChip);
+
+        let summarizeTextContent = summarizeTextSplit[2];
+        let summarizeTextContentSplit = summarizeTextContent.split("\n- ");
+        summarizeTextContentSplit.splice(0, 1)
+
+        // 요약본 내 일정 처리
+        let summarizeTextSchedule = summarizeTextSplit[3];
+        let summarizeTextScheduleSplit = summarizeTextSchedule.split("\n- ");
+        let scheduleIsExist = summarizeTextScheduleSplit[0].includes("있음");
+        if (scheduleIsExist) {
+          // Summary ID 조회
+          ipcRenderer.send('lookupSummaryId',mailHeaderList[selectedMailIndex]["email_id"]);
+          ipcRenderer.once("lookupSummaryIdReply", (eve:any, res:any) => {
+            let summaryId = res;
+            if (res !== -1) {
+              // DB에 일정 저장되어 있는지 확인
+              ipcRenderer.send('lookupScheduleBySummaryId', summaryId);
+              ipcRenderer.once('lookupScheduleBySummaryIdReply', (eve:any, res:any) => {
+                if (res.length === 0) {
+                  // 일정 정제
+                  let scheduleText = summarizeTextScheduleSplit[1];
+                  let dayRegex = /([0-9]{1,4}[/.][0-9]{1,2}[/.][0-9]{1,2})/g;
+                  let timeRegex = /([0-9]{1,2}:[0-9]{1,2})/g;
+                  let dayMatch = scheduleText.match(dayRegex);
+                  let timeMatch = scheduleText.match(timeRegex);
+                  let dayFrom = dayMatch[0];
+                  let timeFrom = timeMatch[0];
+                  var dayTo = dayMatch.length >= 2 ? dayMatch[1] : dayFrom;
+                  var timeTo = dayMatch.length >= 2 ? timeMatch[1] : timeFrom;
+
+                  setScheduleDateFrom(dayFrom);
+                  setScheduleDateTo(dayTo);
+                  setScheduleTimeFrom(timeFrom);
+                  setScheduleTimeTo(timeTo);
+                  setScheduleSummaryID(summaryId);
+                  setScheduleSummaryTitle(mailHeaderList[selectedMailIndex]["subject"][0]);
+
+                  setOpenScheduleAccept(true);
+                }
+              });
+            }
+          });
+        }
+
+        // 최종 출력
+        const renderText = (
+          <Card sx={{mb:2}}>
+            <Box sx={{p:2}}>
+              {summarizeTextContentSplit.map((content: string) => (
+                <Typography>{content}</Typography>
+              ))}
+            </Box>
+          </Card>
+        )
+        SetMailBodySummary(renderText);
+        SetMailSummarizedSnackbarOpen(true);
+      }
       ipcRenderer.removeAllListeners('getMailListReply');
     })
   }
+
+  // 메일 요약 Snackbar 닫기 동작
+  const handleMailSummarizedSnackbarClosed = () => {
+    SetMailSummarizedSnackbarOpen(false);
+  }
+
+  // 메일 요약 Snackbar 버튼 목록
+  const mailSummarizedSnackbarAction = (
+    <React.Fragment>
+      <IconButton
+      size='small'
+      aria-label="close"
+      color="inherit"
+      onClick={handleMailSummarizedSnackbarClosed}
+      >
+        <CloseIcon fontSize='small'/>
+      </IconButton>
+    </React.Fragment>
+  )
 
   // 계정 정보 Drawer
   const drawer = (
@@ -513,6 +649,13 @@ function App() {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{flexGrow: 1}}>Aimail</Typography>
+          <Tooltip title="Summarize">
+            <IconButton
+              color="inherit"
+              aria-label="summarize" onClick={summarizeMail}>
+              <Summarize/>
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Contacts">
             <IconButton
               color="inherit"
@@ -582,29 +725,27 @@ function App() {
         {mailListDrawer}
       </Drawer>
       <Container fixed>
-      <Box sx={{p:2}}>
-        <Toolbar/>
-        <Box sx={{p:2}}>
+        <Card sx={{mb:2}}>
+          <Box sx={{p:2}}>
+          <Toolbar/>
           <Stack direction="row">
             <Typography gutterBottom variant="subtitle1" noWrap sx={{flexGrow: 1}}>{mailBodyFrom}</Typography>
             <Typography gutterBottom variant="subtitle2" noWrap>{mailBodyTimes}</Typography>
           </Stack>
-          <Typography gutterBottom variant="subtitle2" noWrap>{mailBodyTitle}</Typography>
-        </Box>
-        <Divider/>
-        <Box sx={{p:2}}>
-          <ListItemButton onClick={summarizeMail}>
-            <ListItemText primary="summarize"/>
-          </ListItemButton>
-            <Typography>{mailBodySummary}</Typography>
-
-        </Box>
-        <Divider/>
-        <Box sx={{p:2}}>
-        <div id="mailBody"></div>
-        </Box>
-      </Box>
+          <Stack direction="row">
+            <Typography gutterBottom variant="subtitle2" noWrap sx={{flexGrow: 1}}>{mailBodyTitle}</Typography>
+            {mailCategoryChip}
+          </Stack>
+          </Box>
+        </Card>
+        {mailBodySummary}
+        <Card>
+          <Box sx={{p:2}}>
+            <div id="mailBody"/>
+          </Box>
+        </Card>
       </Container>
+      
     </Box>
     <AddAccountDialog open={openAddAccount} onClose={handleCloseAddAccount}/>
     <AddSendAccountDialog open={openAddSendAccount} onClose={handleCloseAddSendAccount}/>
@@ -612,6 +753,7 @@ function App() {
     <SendMailDialog open={openSendMail} onClose={handleCloseSendMail}/>
     <CalendarDialog open={openCalendar} onClose={handleCloseCalendar}/>
     <ContactsDialog open={openContacts} onClose={handleCloseContacts}/>
+    <ScheduleAcceptDialog open={openScheduleAccept} onClose={handleCloseScheduleAccept} scheduleDateFrom={scheduleDateFrom} scheduleDateTo={scheduleDateTo} scheduleTimeFrom={scheduleTimeFrom} scheduleTimeTo={scheduleTimeTo} scheduleSummaryID={scheduleSummaryID} scheduleSummaryTitle={scheduleSummaryTitle}/>
     <Box
       component="nav"
       sx={{ width: {sm: drawerWidth}, flexShrink: {sm: 0}}}
@@ -653,6 +795,13 @@ function App() {
       message="Mail Deleted"
       onClose={handleMailDeletedSnackbarClosed}
       action={mailDeletedSnackbarAction}
+      />
+    <Snackbar
+      open={mailSummarizedSnackbarOpen}
+      autoHideDuration={3000}
+      message="Mail Summarized"
+      onClose={handleMailSummarizedSnackbarClosed}
+      action={mailSummarizedSnackbarAction}
       />
     </>
   );

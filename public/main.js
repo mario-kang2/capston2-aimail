@@ -3,6 +3,7 @@ const path = require('path');
 const url = require('url');
 const sqlite3 = require('sqlite3');
 const management = require("./emailmanagement");
+const dayjs = require('dayjs');
 
 const db = new sqlite3.Database("./mail.db");
 
@@ -13,7 +14,6 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
-            devTools: true
         }
     });
 
@@ -29,7 +29,6 @@ function createWindow() {
     })
 
     win.loadURL(startUrl);
-    win.webContents.openDevTools();
 
     management.setupDatabase();
 }
@@ -142,6 +141,7 @@ ipcMain.on('summarizeMail', (eve, args) => {
     const email_id=args.email_id;
     management.summarizebyopenai(body,email_id,eve);
 });
+
 // 메일 목록 조회 (IMAP)
 ipcMain.on('getMailList', (eve, args) => {
     const Imap = require('node-imap');
@@ -175,7 +175,7 @@ ipcMain.on('searchMaillist', (eve, args) => {
         if (err) {
             console.error('이메일 검색 오류:', err);
         } else {
-            const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
+            const mail=rows.map(({email_id,sender,subject,body,times})=>({email_id:[email_id],from:[sender],subject:[subject],body:[body],times:[times]}));
             eve.sender.send('searchMailListReply', mail);
         }
     })
@@ -214,7 +214,6 @@ ipcMain.on('deleteMail', (eve, args) => {
 // 메일 전송
 ipcMain.on('sendMail', (eve, args) => {
 
-    const log = require('electron-log');
     // 인증 정보 불러오기
     let from = args.from;
     let to = args.to;
@@ -236,8 +235,6 @@ ipcMain.on('sendMail', (eve, args) => {
                 }
             });
 
-            log.info(smtp);
-
             let mailOptions = {
                 from: from,
                 to: to,
@@ -249,10 +246,8 @@ ipcMain.on('sendMail', (eve, args) => {
 
             smtp.sendMail(mailOptions, (err, info) => {
                 if (err) {
-                    log.error(err);
                     eve.sender.send('sendMailReply', false);
                 } else {
-                    log.info(info);
                     eve.sender.send('sendMailReply', true);
                 }
             });
@@ -267,7 +262,7 @@ ipcMain.on('searchMail', (eve, searchBy,query) => {
         if (err) {
             console.error('이메일 가져오기 오류:', err);
         } else {
-            const mail=rows.map(({sender,subject,body,times})=>({from:[sender],subject:[subject],body:[body],times:[times]}));
+            const mail=rows.map(({email_id,sender,subject,body,times})=>({email_id:[email_id],from:[sender],subject:[subject],body:[body],times:[times]}));
             eve.sender.send('searchMailReply', mail);
         }
     });
@@ -289,4 +284,112 @@ ipcMain.on('addContact', (eve, args) => {
 ipcMain.on('removeContact', (eve, args) => {
     db.run('DELETE FROM contact WHERE Address = ?', [args.address], err => {
     })
+})
+
+// 로컬 요약 데이터 조회
+ipcMain.on('lookupLocalSummary', (eve, args) => {
+    db.all('SELECT * FROM summary WHERE email_id = ?', args, async (err, rows) => {
+        if (rows.length > 0) {
+            eve.sender.send('lookupLocalSummaryReply', rows[0].summary_text);
+        }
+        else {
+            eve.sender.send('lookupLocalSummaryReply', "");
+        }
+    });
+});
+
+// 로컬 요약 데이터 내 Summary ID 조회
+ipcMain.on('lookupSummaryId', (eve, args) => {
+    db.all('SELECT * FROM summary WHERE email_id = ?', args, async (err, rows) => {
+        if (rows.length > 0) {
+            eve.sender.send('lookupSummaryIdReply', rows[0].summary_id);
+        }
+        else {
+            eve.sender.send('lookupSummaryIdReply', -1);
+        }
+    });
+});
+
+// 일정 데이터 조회
+ipcMain.on('lookupSchedule', (eve, args) => {
+    let date = dayjs(args); // dayjs 객체
+    
+    let start = date.startOf('day').format('YYYY-MM-DD HH:mm:ss');
+    let end = date.endOf('day').format('YYYY-MM-DD HH:mm:ss');
+
+    db.all('SELECT * FROM schedule WHERE start_time <= ? AND end_time >= ?', [end, start], (err, rows) => {
+        if (err) {
+        } else {
+            eve.sender.send('lookupScheduleReply', rows);
+        }
+    });  
+})
+
+ipcMain.on('lookupScheduleMonth', (eve, args) => {
+    let date = dayjs(args); // dayjs 객체
+
+    let start = date.startOf('month').format('YYYY-MM-DD HH:mm:ss');
+    let end = date.endOf('month').format('YYYY-MM-DD HH:mm:ss');
+
+    db.all('SELECT * FROM schedule WHERE start_time <= ? AND end_time >= ?', [end, start], (err, rows) => {
+        if (err) {
+        } else {
+            var result = [];
+            rows.forEach((row) => {
+                let start = dayjs(row.start_time).date();
+                let end = dayjs(row.end_time).date();
+
+                if (start === end) {
+                    if (!result.includes(start))
+                        result.push(start);
+                }
+                else {
+                    for (let i = start; i <= end; i++) {
+                        if (!result.includes(i))
+                            result.push(i);
+                    }
+                }
+            
+            })
+            eve.sender.send('lookupScheduleMonthReply', result);
+        }
+    });
+})
+
+// summary_id 이용한 일정 데이터 조회
+ipcMain.on('lookupScheduleBySummaryId', (eve, args) => {
+    db.all('SELECT * FROM schedule WHERE summary_id = ?', args, (err, rows) => {
+        if (err) {
+        } else {
+            eve.sender.send('lookupScheduleBySummaryIdReply', rows);
+        }
+    });
+})
+
+// 일정 데이터 추가
+ipcMain.on('addSchedule', (eve, args) => {
+    let fromDate = dayjs();
+    let toDate = dayjs();
+
+    let fromStr = args.dateFrom.split('/').length === 1 ? args.dateFrom.split('.') : args.dateFrom.split('/');
+    let toStr = args.dateTo.split('/').length === 1 ? args.dateTo.split('.') : args.dateTo.split('/');
+
+    fromDate = fromDate.set('year', fromStr[0]);
+    fromDate = fromDate.set('month', fromStr[1] - 1);
+    fromDate = fromDate.set('date', fromStr[2]);
+    fromDate = fromDate.set('hour', args.timeFrom.split(':')[0]);
+    fromDate = fromDate.set('minute', args.timeFrom.split(':')[1]);
+    fromDate = fromDate.set('second', 0);
+
+    toDate = toDate.set('year', toStr[0]);
+    toDate = toDate.set('month', toStr[1] - 1);
+    toDate = toDate.set('date', toStr[2]);
+    toDate = toDate.set('hour', args.timeTo.split(':')[0]);
+    toDate = toDate.set('minute', args.timeTo.split(':')[1]);
+    toDate = toDate.set('second', 0);
+
+    let fromDateStr = fromDate.format('YYYY-MM-DD HH:mm:ss');
+    let toDateStr = toDate.format('YYYY-MM-DD HH:mm:ss');
+
+    db.run('INSERT INTO schedule (summary_id, start_time, end_time, title) VALUES (?, ?, ?, ?)', [args.summaryID, fromDateStr, toDateStr, args.title]);
 })
